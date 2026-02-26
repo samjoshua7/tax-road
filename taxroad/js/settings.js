@@ -1,4 +1,4 @@
-import { auth, db, onAuthStateChanged, doc, getDoc, setDoc } from './firebase-config.js';
+import { auth, db, onAuthStateChanged, doc, getDoc, setDoc, signOut } from './firebase-config.js';
 import { loadComponents, showToast, setPageTitle } from './utils.js';
 
 let currentUser = null;
@@ -13,9 +13,38 @@ async function initSettings() {
         currentUser = user;
         await loadComponents();
         setPageTitle('Settings');
+        setupNavigation();
         setupForm();
         await loadProfile();
     });
+}
+
+function setupNavigation() {
+    const sidebar = document.getElementById('sidebar-container');
+    const hamburgerBtn = document.getElementById('hamburger-btn');
+    const overlay = document.getElementById('mobile-overlay');
+
+    if (hamburgerBtn && sidebar && overlay) {
+        hamburgerBtn.addEventListener('click', () => {
+            sidebar.classList.toggle('open');
+            overlay.classList.toggle('active');
+        });
+        overlay.addEventListener('click', () => {
+            sidebar.classList.remove('open');
+            overlay.classList.remove('active');
+        });
+    }
+
+    const logoutBtn = document.getElementById('logout-btn');
+    if (logoutBtn) {
+        logoutBtn.addEventListener('click', async () => {
+            try {
+                await signOut(auth);
+            } catch (error) {
+                showToast("Error during logout", "error");
+            }
+        });
+    }
 }
 
 function setupForm() {

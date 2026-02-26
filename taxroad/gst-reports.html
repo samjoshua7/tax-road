@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tax Road – GST Reports</title>
+    <link rel="stylesheet" href="css/styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        .period-bar {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: var(--spacing-md);
+            background: var(--white);
+            border-radius: var(--radius-card);
+            padding: var(--spacing-md) var(--spacing-lg);
+            box-shadow: var(--shadow-soft);
+            margin-bottom: var(--spacing-lg);
+        }
+
+        .period-bar label {
+            font-weight: 600;
+            color: var(--text-muted);
+            font-size: 13px;
+        }
+
+        .period-bar select {
+            padding: 8px 12px;
+            border: 1px solid var(--border);
+            border-radius: var(--radius-btn);
+            font-size: 14px;
+            min-width: 120px;
+        }
+
+        .report-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: var(--spacing-lg);
+            margin-top: var(--spacing-lg);
+        }
+
+        @media (max-width: 768px) {
+            .report-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .report-card-title {
+            font-size: 16px;
+            font-weight: 700;
+            color: var(--primary);
+            margin-bottom: 4px;
+        }
+
+        .report-card-desc {
+            font-size: 13px;
+            color: var(--text-muted);
+            margin-bottom: var(--spacing-md);
+        }
+
+        .warning-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .warning-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 13px;
+            padding: 8px 12px;
+            border-radius: 6px;
+        }
+
+        .warning-item.warn {
+            background: #FEF3C7;
+            color: #92400E;
+        }
+
+        .warning-item.error {
+            background: #FEE2E2;
+            color: #991B1B;
+        }
+
+        .warning-item.ok {
+            background: #D1FAE5;
+            color: #065F46;
+        }
+
+        .section-label {
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            color: var(--text-muted);
+            letter-spacing: 0.5px;
+            margin-bottom: 8px;
+        }
+
+        .disclaimer-box {
+            margin-top: var(--spacing-lg);
+            padding: var(--spacing-md);
+            border-radius: 8px;
+            background: #EFF6FF;
+            border: 1px solid #BFDBFE;
+            font-size: 13px;
+            color: #1E40AF;
+            line-height: 1.6;
+        }
+
+        tfoot tr td {
+            border-bottom: none;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="app-container">
+        <!-- Sidebar Shell -->
+        <aside class="sidebar" id="sidebar-container"></aside>
+
+        <!-- Mobile Overlay -->
+        <div class="overlay" id="mobile-overlay"></div>
+
+        <main class="main-content">
+            <!-- Top Nav Shell -->
+            <header class="topnav" id="topnav-container"></header>
+
+            <div class="content-area">
+
+                <!-- Page Header -->
+                <div class="flex-between mb-lg flex-wrap gap-md">
+                    <div>
+                        <h2 class="text-primary">GST Reports</h2>
+                        <p class="text-muted" style="margin-top:4px; font-size:13px;">Generate GSTR-3B and ITC summaries
+                            for filing</p>
+                    </div>
+                    <div id="compliance-status-badge" class="compliance-status status-missing">
+                        ❌ Business GSTIN not configured
+                    </div>
+                </div>
+
+                <!-- Period Selection Bar -->
+                <div class="period-bar">
+                    <div>
+                        <label>Financial Month</label><br>
+                        <select id="select-month">
+                            <option value="1">April</option>
+                            <option value="2">May</option>
+                            <option value="3">June</option>
+                            <option value="4">July</option>
+                            <option value="5">August</option>
+                            <option value="6">September</option>
+                            <option value="7">October</option>
+                            <option value="8">November</option>
+                            <option value="9">December</option>
+                            <option value="10">January</option>
+                            <option value="11">February</option>
+                            <option value="12">March</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label>Financial Year</label><br>
+                        <select id="select-fy"></select>
+                    </div>
+                    <button class="btn btn-primary" id="btn-generate" style="align-self: flex-end;">
+                        <svg class="icon" viewBox="0 0 24 24">
+                            <path
+                                d="M17 12h-5v5h5v-5zM16 1v2H8V1H6v2H5c-1.11 0-1.99.9-1.99 2L3 19c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2h-1V1h-2zm3 18H5V8h14v11z" />
+                        </svg>
+                        Generate Report
+                    </button>
+                </div>
+
+                <!-- Compliance Warnings -->
+                <div id="warnings-section" class="rounded-card bg-white p-lg soft-shadow mb-lg hidden">
+                    <div class="section-label">Compliance Checks</div>
+                    <ul class="warning-list" id="warnings-list"></ul>
+                </div>
+
+                <!-- GSTR-3B Summary Preview -->
+                <div id="summary-section" class="rounded-card bg-white p-lg soft-shadow hidden">
+                    <div class="flex-between mb-md">
+                        <div>
+                            <div class="section-label">GSTR-3B Preview</div>
+                            <h3 class="text-primary" id="report-period-title">—</h3>
+                        </div>
+                        <div style="display:flex; gap: 8px; flex-wrap: wrap;">
+                            <button class="btn btn-outline" id="btn-print" title="Print this summary">
+                                <svg class="icon" viewBox="0 0 24 24">
+                                    <path
+                                        d="M19 8H5c-1.66 0-3 1.34-3 3v6h4v4h12v-4h4v-6c0-1.66-1.34-3-3-3zm-3 11H8v-5h8v5zm3-7c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1zm-1-9H6v4h12V3z" />
+                                </svg>
+                                Print
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Section 3.1 Summary Table -->
+                    <div style="overflow-x:auto;">
+                        <table class="gst-summary-table" style="width:100%; border-collapse:collapse; font-size:13px;">
+                            <thead>
+                                <tr>
+                                    <th style="text-align:left; padding:10px 12px;">Nature of Supplies</th>
+                                    <th style="text-align:right; padding:10px 12px;">Taxable Value (₹)</th>
+                                    <th style="text-align:right; padding:10px 12px;">IGST (₹)</th>
+                                    <th style="text-align:right; padding:10px 12px;">CGST (₹)</th>
+                                    <th style="text-align:right; padding:10px 12px;">SGST/UTGST (₹)</th>
+                                    <th style="text-align:right; padding:10px 12px;">Cess (₹)</th>
+                                </tr>
+                            </thead>
+                            <tbody id="gstr3b-tbody"></tbody>
+                            <tfoot id="gstr3b-tfoot"></tfoot>
+                        </table>
+                    </div>
+
+                    <!-- Tax Payable Summary -->
+                    <div
+                        style="margin-top: var(--spacing-lg); display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: var(--spacing-md);">
+                        <div class="stat-card" style="min-width:0; border-top: 3px solid var(--primary);">
+                            <div class="stat-title">Total Taxable Value</div>
+                            <div class="stat-value" id="stat-taxable">₹0</div>
+                        </div>
+                        <div class="stat-card" style="min-width:0; border-top: 3px solid #6366F1;">
+                            <div class="stat-title">IGST Liability</div>
+                            <div class="stat-value" id="stat-igst">₹0</div>
+                        </div>
+                        <div class="stat-card" style="min-width:0; border-top: 3px solid var(--accent);">
+                            <div class="stat-title">CGST Liability</div>
+                            <div class="stat-value" id="stat-cgst">₹0</div>
+                        </div>
+                        <div class="stat-card" style="min-width:0; border-top: 3px solid #F59E0B;">
+                            <div class="stat-title">SGST Liability</div>
+                            <div class="stat-value" id="stat-sgst">₹0</div>
+                        </div>
+                        <div class="stat-card" style="min-width:0; border-top: 3px solid var(--text-error);">
+                            <div class="stat-title">Total Tax Liability</div>
+                            <div class="stat-value" id="stat-total-tax">₹0</div>
+                        </div>
+                    </div>
+
+                    <!-- Download Cards -->
+                    <div class="report-grid">
+                        <div class="report-card">
+                            <div class="report-card-title">📊 GSTR-3B Return</div>
+                            <div class="report-card-desc">
+                                Monthly outward tax liability summary (Section 3.1 & 3.2).<br>
+                                Includes intra-state / inter-state split, invoice-wise breakdown.
+                            </div>
+                            <button class="btn btn-primary" id="btn-download-gstr3b" style="margin-top:auto;">
+                                <svg class="icon" viewBox="0 0 24 24">
+                                    <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z" />
+                                </svg>
+                                Download GSTR-3B (Excel)
+                            </button>
+                        </div>
+                        <div class="report-card accent">
+                            <div class="report-card-title">📥 GSTR-2A / ITC Summary</div>
+                            <div class="report-card-desc">
+                                Input Tax Credit template and reconciliation framework.<br>
+                                Add your purchase entries to enable full ITC matching.
+                            </div>
+                            <button class="btn btn-accent" id="btn-download-gstr2a" style="margin-top:auto;">
+                                <svg class="icon" viewBox="0 0 24 24">
+                                    <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z" />
+                                </svg>
+                                Download GSTR-2A Template (Excel)
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Disclaimer -->
+                    <div class="disclaimer-box">
+                        ⚠️ <strong>Compliance Disclaimer:</strong> This report is system-generated from your billing
+                        data for reference purposes only.
+                        Please validate all figures with your Chartered Accountant or Tax Professional before filing on
+                        the GST Portal (gstin.gov.in).
+                        Tax Road is not responsible for any incorrect filings. Figures are based on invoice data entered
+                        in the system.
+                    </div>
+                </div>
+
+                <!-- Empty state -->
+                <div id="empty-section" class="rounded-card bg-white p-lg soft-shadow text-center py-lg">
+                    <svg style="width:64px;height:64px;opacity:0.2;margin:0 auto 16px;" viewBox="0 0 24 24"
+                        fill="currentColor">
+                        <path
+                            d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 14l-5-5 1.41-1.41L12 14.17l7.59-7.59L21 8l-9 9z" />
+                    </svg>
+                    <p class="text-muted">Select a month and year, then click <strong>Generate Report</strong>.</p>
+                </div>
+
+            </div><!-- content-area -->
+        </main>
+    </div>
+
+    <!-- SheetJS for Excel export -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <!-- Firebase SDK (Modular) -->
+    <script type="module" src="js/firebase-config.js"></script>
+    <script type="module" src="js/utils.js"></script>
+    <script type="module" src="js/gst-reports.js"></script>
+</body>
+
+</html>

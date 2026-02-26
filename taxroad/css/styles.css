@@ -574,10 +574,72 @@ tr:last-child td {
     color: #991B1B;
 }
 
-/* Invoices Line Items */
+/* GST Compliance Status Indicators */
+.compliance-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 20px;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 15px;
+}
+
+.status-ready {
+    background: #D1FAE5;
+    color: #065F46;
+    border: 1.5px solid #6EE7B7;
+}
+
+.status-review {
+    background: #FEF3C7;
+    color: #92400E;
+    border: 1.5px solid #FCD34D;
+}
+
+.status-missing {
+    background: #FEE2E2;
+    color: #991B1B;
+    border: 1.5px solid #FCA5A5;
+}
+
+/* GST Summary Table overrides */
+.gst-summary-table th {
+    background: #EFF6FF;
+    color: var(--primary);
+}
+
+.gst-summary-table tfoot td {
+    font-weight: 700;
+    background: var(--bg-light-grey);
+    border-top: 2px solid var(--primary);
+}
+
+/* Report Download Cards */
+.report-card {
+    background: var(--white);
+    border-radius: var(--radius-card);
+    box-shadow: var(--shadow-soft);
+    padding: var(--spacing-lg);
+    border-left: 4px solid var(--primary);
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-sm);
+    transition: transform 0.15s;
+}
+
+.report-card:hover {
+    transform: translateY(-2px);
+}
+
+.report-card.accent {
+    border-left-color: var(--accent);
+}
+
+/* Invoice Line Items — updated for HSN column */
 .line-item-row {
     display: grid;
-    grid-template-columns: 2fr 1fr 1fr 1fr auto;
+    grid-template-columns: 2fr 1fr 1fr 1fr 1fr auto;
     gap: 8px;
     align-items: center;
     margin-bottom: 8px;

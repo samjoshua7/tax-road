@@ -116,16 +116,16 @@ async function loadUserProfile() {
         console.log('[TAX ROAD DEBUG] Fetching user profile from Firestore...');
         const userDoc = await getDoc(doc(db, 'users', currentUser.uid));
         if (userDoc.exists()) {
-                const userData = userDoc.data();
-                console.log('[TAX ROAD DEBUG] User profile loaded:', userData.businessName);
-                currentBusinessName = userData.businessName || '';
-                currentUpiId = userData.upiId || '';
-                const nameDisplay = document.getElementById('user-display-name');
-                if (nameDisplay && currentBusinessName) {
-                    nameDisplay.textContent = currentBusinessName;
-                    nameDisplay.style.display = 'block';
-                }
-            } else {
+            const userData = userDoc.data();
+            console.log('[TAX ROAD DEBUG] User profile loaded:', userData.businessName);
+            currentBusinessName = userData.businessName || '';
+            currentUpiId = userData.upiId || '';
+            const nameDisplay = document.getElementById('user-display-name');
+            if (nameDisplay && currentBusinessName) {
+                nameDisplay.textContent = currentBusinessName;
+                nameDisplay.style.display = 'block';
+            }
+        } else {
             console.warn('[TAX ROAD WARN] No user profile found in Firestore');
         }
     } catch (e) {
@@ -353,7 +353,7 @@ function closeModal() {
 }
 
 function addLineItemUI(itemData = null) {
-    const defaultItem = { name: '', quantity: 1, price: 0, gstPercent: 18 };
+    const defaultItem = { name: '', quantity: 1, price: 0, gstPercent: 18, hsnCode: '' };
     const item = itemData || defaultItem;
 
     const div = document.createElement('div');
@@ -371,12 +371,13 @@ function addLineItemUI(itemData = null) {
         </div>
         <div class="form-group" style="margin-bottom:0;">
             <select class="form-control item-gst">
-                <option value="0" ${item.gstPercent === 0 ? 'selected' : ''}>0%</option>
-                <option value="5" ${item.gstPercent === 5 ? 'selected' : ''}>5%</option>
-                <option value="12" ${item.gstPercent === 12 ? 'selected' : ''}>12%</option>
+                <option value="5"  ${item.gstPercent === 5 ? 'selected' : ''}>5%</option>
                 <option value="18" ${item.gstPercent === 18 ? 'selected' : ''}>18%</option>
-                <option value="28" ${item.gstPercent === 28 ? 'selected' : ''}>28%</option>
+                <option value="40" ${item.gstPercent === 40 ? 'selected' : ''}>40%</option>
             </select>
+        </div>
+        <div class="form-group" style="margin-bottom:0;">
+            <input type="text" class="form-control item-hsn" placeholder="HSN/SAC" maxlength="8" value="${escapeHtml(item.hsnCode || '')}" title="Harmonised System of Nomenclature or SAC code">
         </div>
         <button type="button" class="btn btn-outline btn-delete-item" style="padding: 10px; border-color: var(--text-error); color: var(--text-error);">
             <svg class="icon" viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
@@ -403,13 +404,17 @@ function calculateTotals() {
         gstAmount += lineGst;
     });
 
-    const total = subtotal + gstAmount;
+    // GST is always split 50/50 as CGST + SGST
+    const cgstAmount = +(gstAmount / 2).toFixed(2);
+    const sgstAmount = +(gstAmount / 2).toFixed(2);
+    const total = +(subtotal + gstAmount).toFixed(2);
 
     document.getElementById('inv-subtotal').textContent = formatCurrency(subtotal);
-    document.getElementById('inv-gst').textContent = formatCurrency(gstAmount);
+    document.getElementById('inv-cgst').textContent = formatCurrency(cgstAmount);
+    document.getElementById('inv-sgst').textContent = formatCurrency(sgstAmount);
     document.getElementById('inv-total').textContent = formatCurrency(total);
 
-    return { subtotal, gstAmount, total };
+    return { subtotal: +subtotal.toFixed(2), gstAmount: +gstAmount.toFixed(2), cgstAmount, sgstAmount, total };
 }
 
 async function fetchInvoices() {
@@ -528,9 +533,11 @@ function gatherLineItems() {
         const qty = parseFloat(row.querySelector('.item-qty').value) || 0;
         const price = parseFloat(row.querySelector('.item-price').value) || 0;
         const gstPct = parseFloat(row.querySelector('.item-gst').value) || 0;
+        const hsnEl = row.querySelector('.item-hsn');
+        const hsnCode = hsnEl ? hsnEl.value.trim() : '';
 
         if (name && qty > 0) {
-            items.push({ name, quantity: qty, price, gstPercent: gstPct });
+            items.push({ name, quantity: qty, price, gstPercent: gstPct, hsnCode });
         }
     });
 
@@ -552,7 +559,7 @@ async function handleSaveInvoice(e) {
         return;
     }
 
-    const { subtotal, gstAmount, total } = calculateTotals();
+    const { subtotal, gstAmount, cgstAmount, sgstAmount, total } = calculateTotals();
     const btnSave = document.getElementById('btn-save');
     const id = document.getElementById('invoice-id').value;
     const invNumber = document.getElementById('inv-number').value;
@@ -563,6 +570,8 @@ async function handleSaveInvoice(e) {
         items,
         subtotal,
         gstAmount,
+        cgstAmount,   // CGST = gstAmount / 2
+        sgstAmount,   // SGST = gstAmount / 2
         total,
         // Convert yyyy-mm-dd to ISO UTC for consistency, or store as string if parsing is needed
         createdAt: new Date(invDateStr).toISOString()
@@ -654,7 +663,7 @@ async function handleDelete(invoice) {
 function openViewModal(invoice) {
     const modal = document.getElementById('view-invoice-modal');
     const preview = document.getElementById('invoice-preview');
-    
+
     // Render A4 invoice HTML
     const customerName = customersMap[invoice.customerId] || 'Unknown Customer';
     const itemsHtml = (invoice.items || []).map(item => `
@@ -795,7 +804,7 @@ function openViewModal(invoice) {
 
     // Setup modal close
     document.getElementById('view-modal-close').onclick = closeViewModal;
-    
+
     modal.classList.add('active');
 }
 
