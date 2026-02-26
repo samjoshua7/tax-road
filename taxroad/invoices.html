@@ -47,7 +47,8 @@
                     <div class="flex gap-md flex-wrap">
                         <div class="search-container" style="width: 100%; max-width: 300px;">
                             <svg class="icon search-icon" viewBox="0 0 24 24">
-                                <path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z" />
+                                <path
+                                    d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z" />
                             </svg>
                             <input type="text" id="global-search" class="search-input" placeholder="Search invoices...">
                         </div>
@@ -75,7 +76,10 @@
                             </thead>
                             <tbody id="invoices-body">
                                 <tr>
-                                    <td colspan="6" class="text-center text-muted py-md">Loading invoices...</td>
+                                    <td colspan="6" class="text-center py-lg">
+                                        <div class="loader mx-auto"></div>
+                                        <div class="text-muted mt-sm">Loading invoices...</div>
+                                    </td>
                                 </tr>
                             </tbody>
                         </table>
@@ -169,6 +173,56 @@
         </div>
     </div>
 
+    <!-- View Invoice Modal (A4 PDF Preview) -->
+    <div class="modal-overlay" id="view-invoice-modal">
+        <div class="modal-content" style="width: 100%; max-width: 900px; max-height: 90vh; display: flex; flex-direction: column;">
+            <div class="modal-header">
+                <h3 class="text-primary" id="view-modal-title">Invoice Preview</h3>
+                <button class="modal-close" id="view-modal-close">&times;</button>
+            </div>
+
+            <div style="flex: 1; overflow-y: auto; padding: var(--spacing-lg); border-bottom: 1px solid var(--border);">
+                <!-- A4 Invoice Preview -->
+                <div id="invoice-preview" style="background: white; width: 210mm; height: 297mm; margin: 0 auto; padding: 20mm; box-shadow: 0 0 10px rgba(0,0,0,0.1); font-family: Arial, sans-serif; font-size: 11pt; color: #333;">
+                    <!-- Invoice content will be rendered here -->
+                </div>
+            </div>
+
+            <!-- QR Code & Actions Footer -->
+            <div style="padding: var(--spacing-lg); background: var(--bg-light-grey); display: grid; grid-template-columns: 1fr 1fr; gap: var(--spacing-lg); align-items: center;">
+                <div style="text-align: center;">
+                    <div id="qr-code-container" style="display: flex; justify-content: center; margin-bottom: var(--spacing-md);"></div>
+                    <p style="margin: 0; font-size: 12pt; font-weight: bold;">Scan to Pay</p>
+                    <p style="margin: 4px 0 0 0; font-size: 10pt; color: var(--text-muted);" id="qr-upi-text"></p>
+                </div>
+
+                <div style="display: flex; flex-direction: column; gap: var(--spacing-sm);">
+                    <button class="btn btn-primary" id="btn-download-pdf" style="width: 100%;">
+                        <svg class="icon" viewBox="0 0 24 24" style="margin-right: 8px;">
+                            <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
+                        </svg>
+                        Download PDF
+                    </button>
+                    <button class="btn btn-outline" id="btn-download-image" style="width:100%;">
+                        <svg class="icon" viewBox="0 0 24 24" style="margin-right:8px;">
+                            <path d="M21 19V5a2 2 0 0 0-2-2H5c-1.1 0-2 .9-2 2v14h18zM7 9l2.5 3L11 9l4 6H7z"/>
+                        </svg>
+                        Download Image
+                    </button>
+                    <button class="btn btn-outline" id="btn-whatsapp" style="width: 100%; border-color: #25D366; color: #25D366;">
+                        <svg class="icon" viewBox="0 0 24 24" style="margin-right: 8px; fill: #25D366;">
+                            <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.67-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.076 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421-7.403h-.004a9.87 9.87 0 00-9.746 9.798c0 2.734.732 5.405 2.124 7.722L3.54 21.42l8.22-2.158c2.254 1.226 4.799 1.876 7.465 1.876 5.44 0 9.885-4.418 9.885-9.855 0-2.631-.675-5.127-1.963-7.297-1.287-2.17-3.12-4.095-5.368-5.389-2.248-1.294-4.803-1.976-7.371-1.976z"/>
+                        </svg>
+                        Send on WhatsApp
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Firebase & Libraries -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <!-- Firebase SDK (Modular) -->
     <script type="module" src="js/firebase-config.js"></script>
     <script type="module" src="js/utils.js"></script>

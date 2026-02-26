@@ -43,15 +43,48 @@ export function setPageTitle(title) {
     if (pageTitle) pageTitle.textContent = title;
 }
 
+// Simple helpers for rendering a spinner row in tables
+export function showLoadingRow(tbody, colspan = 1, message = 'Loading...') {
+    if (!tbody) return;
+    tbody.innerHTML = `
+        <tr>
+            <td colspan="${colspan}" class="text-center py-lg">
+                <div class="loader mx-auto"></div>
+                <div class="text-muted mt-sm">${message}</div>
+            </td>
+        </tr>
+    `;
+    const container = tbody.closest('.table-container');
+    if (container) container.style.opacity = '0.7';
+}
+
+export function hideLoadingRow(tbody) {
+    if (!tbody) return;
+    const container = tbody.closest('.table-container');
+    if (container) container.style.opacity = '1';
+}
+
 // Load common components (Sidebar, Topnav) — fetched IN PARALLEL to cut latency
 export async function loadComponents() {
     try {
-        const version = Date.now();
+        const sidebarContainer = document.getElementById('sidebar-container');
+        const topnavContainer = document.getElementById('topnav-container');
 
-        // ✅ FIX: Fetch both components simultaneously (was serial before — ~400-800ms slower)
+        // If both already loaded we can skip network fetch to speed up repeated navigations
+        if (sidebarContainer && sidebarContainer.innerHTML.trim() &&
+            topnavContainer && topnavContainer.innerHTML.trim()) {
+            // Just ensure correct active nav
+            const currentPath = window.location.pathname.split('/').pop() || 'dashboard.html';
+            const navId = `nav-${currentPath.replace('.html', '')}`;
+            const activeNav = document.getElementById(navId);
+            if (activeNav) activeNav.classList.add('active');
+            return;
+        }
+
+        // Fetch both components simultaneously (parallel to cut latency)
         const [sidebarResponse, topnavResponse] = await Promise.all([
-            fetch(`components/sidebar.html?v=${version}`),
-            fetch(`components/topnav.html?v=${version}`)
+            fetch(`components/sidebar.html`),
+            fetch(`components/topnav.html`)
         ]);
 
         if (!sidebarResponse.ok) throw new Error(`Sidebar fetch failed: HTTP ${sidebarResponse.status}`);
@@ -61,9 +94,6 @@ export async function loadComponents() {
             sidebarResponse.text(),
             topnavResponse.text()
         ]);
-
-        const sidebarContainer = document.getElementById('sidebar-container');
-        const topnavContainer = document.getElementById('topnav-container');
 
         if (sidebarContainer) sidebarContainer.innerHTML = sidebarHtml;
         else console.error('[TAX ROAD] sidebar-container not found in DOM');

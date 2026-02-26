@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tax Road - Settings</title>
+    <link rel="stylesheet" href="css/styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+
+<body>
+    <div class="app-container">
+        <!-- Sidebar Shell -->
+        <aside class="sidebar" id="sidebar-container"></aside>
+
+        <!-- Mobile Overlay -->
+        <div class="overlay" id="mobile-overlay"></div>
+
+        <main class="main-content">
+            <!-- Top Nav Shell -->
+            <header class="topnav" id="topnav-container"></header>
+
+            <div class="content-area">
+                <div class="flex-between mb-lg flex-wrap gap-md">
+                    <h2 class="text-primary">Settings</h2>
+                </div>
+
+                <div class="rounded-card bg-white p-lg soft-shadow" style="max-width:800px;">
+                    <form id="settings-form">
+                        <div class="form-group">
+                            <label class="form-label">Business Name *</label>
+                            <input id="businessName" type="text" class="form-control" required>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label">Phone Number</label>
+                            <input id="phone" type="tel" class="form-control" placeholder="e.g. +919XXXXXXXXX">
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label">GST Number</label>
+                            <input id="gstNumber" type="text" class="form-control">
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label">UPI ID</label>
+                            <input id="upiId" type="text" class="form-control" placeholder="your@upi">
+                            <small class="text-muted">Used to generate invoice QR codes for payments.</small>
+                        </div>
+
+                        <div class="flex gap-md mt-md">
+                            <button type="button" id="btn-cancel" class="btn btn-outline">Cancel</button>
+                            <button type="submit" id="btn-save" class="btn btn-primary">Save Changes</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Firebase & App -->
+    <script type="module" src="js/firebase-config.js"></script>
+    <script type="module" src="js/utils.js"></script>
+    <script type="module" src="js/settings.js"></script>
+</body>
+
+</html>

@@ -1,5 +1,5 @@
-import { auth, db, onAuthStateChanged, collection, query, getDocs, addDoc, updateDoc, doc, deleteDoc, serverTimestamp, getDoc, signOut, where } from './firebase-config.js';
-import { loadComponents, showToast, setPageTitle } from './utils.js';
+import { auth, db, onAuthStateChanged, collection, query, getDocs, addDoc, updateDoc, doc, deleteDoc, serverTimestamp, getDoc, signOut, where, orderBy } from './firebase-config.js';
+import { loadComponents, showToast, setPageTitle, showLoadingRow, hideLoadingRow } from './utils.js';
 
 let currentUser = null;
 let customers = [];
@@ -141,6 +141,9 @@ function setupEventListeners() {
     });
 
     form.addEventListener('submit', handleSaveCustomer);
+
+    // Set up table-level delegation once (survives tbody re-renders)
+    setupTableDelegation();
 }
 
 function openModal(customer = null) {
@@ -170,13 +173,13 @@ async function fetchCustomers() {
 
         // Show loading state
         if (tbody) {
-            tbody.innerHTML = `<tr><td colspan="5" class="text-center py-lg"><div class="loader mx-auto"></div><div class="text-muted mt-sm">Loading customers...</div></td></tr>`;
-            tbody.closest('.table-container').style.opacity = '0.7';
+            showLoadingRow(tbody, 5, 'Loading customers...');
         }
 
         const customersRef = collection(db, `users/${currentUser.uid}/customers`);
         // Simple order by party name might require index, fetching all and sorting client side for MVP
-        const q = query(customersRef);
+        // fetch sorted by partyName to avoid client-side sort
+        const q = query(customersRef, orderBy('partyName'));
         const snaps = await getDocs(q);
 
         allCustomersRaw = [];
@@ -186,10 +189,7 @@ async function fetchCustomers() {
 
         console.log(`[TAX ROAD DEBUG] Loaded ${allCustomersRaw.length} customers`);
 
-        // Sort alphabetically
-        allCustomersRaw.sort((a, b) => a.partyName.localeCompare(b.partyName));
-
-        if (tbody) tbody.closest('.table-container').style.opacity = '1';
+        if (tbody) hideLoadingRow(tbody);
         renderCustomers(allCustomersRaw);
     } catch (error) {
         console.error("[TAX ROAD ERROR] Error fetching customers:", error);
@@ -252,24 +252,45 @@ function renderCustomers(dataList) {
     });
 
     tbody.innerHTML = html;
+}
 
-    // Attach Edit/Delete Listeners
-    document.querySelectorAll('.btn-edit').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            const tr = e.target.closest('tr');
+// Attach Edit/Delete using event delegation — delegated at document level for reliability
+function setupTableDelegation() {
+    document.addEventListener('click', (e) => {
+        const btnEdit = e.target.closest && e.target.closest('.btn-edit');
+        const btnDel = e.target.closest && e.target.closest('.btn-delete');
+
+        if (btnEdit) {
+            if (btnEdit.disabled) {
+                console.log('[TAX ROAD DEBUG] Customer Edit clicked but disabled.');
+                return;
+            }
+            const tr = btnEdit.closest('tr[data-id]');
+            if (!tr) return;
             const id = tr.dataset.id;
+            console.log('[TAX ROAD DEBUG] Customer Edit clicked for id:', id);
             const customer = allCustomersRaw.find(c => c.id === id);
             if (customer) openModal(customer);
-        });
-    });
+            else console.warn('[TAX ROAD WARN] Customer not found for edit:', id);
+        }
 
-    document.querySelectorAll('.btn-delete').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            const tr = e.target.closest('tr');
+        if (btnDel) {
+            if (btnDel.disabled) {
+                console.log('[TAX ROAD DEBUG] Customer Delete clicked but disabled.');
+                return;
+            }
+            const tr = btnDel.closest('tr[data-id]');
+            if (!tr) return;
             const id = tr.dataset.id;
+            console.log('[TAX ROAD DEBUG] Customer Delete clicked for id:', id);
             const customer = allCustomersRaw.find(c => c.id === id);
-            if (customer) handleDelete(customer);
-        });
+            if (customer) {
+                handleDelete(customer).catch(err => {
+                    console.error('[TAX ROAD ERROR] handleDelete customer failed:', err);
+                    showToast('Failed to delete customer: ' + (err && err.message ? err.message : ''), 'error');
+                });
+            } else console.warn('[TAX ROAD WARN] Customer not found for delete:', id);
+        }
     });
 }
 

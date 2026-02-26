@@ -1,5 +1,5 @@
-import { auth, db, onAuthStateChanged, collection, query, getDocs, addDoc, updateDoc, deleteDoc, doc, getDoc, serverTimestamp, signOut, runTransaction, where } from './firebase-config.js';
-import { loadComponents, showToast, formatCurrency, formatDate, setPageTitle } from './utils.js';
+import { auth, db, onAuthStateChanged, collection, query, getDocs, addDoc, updateDoc, deleteDoc, doc, getDoc, serverTimestamp, signOut, runTransaction, where, orderBy } from './firebase-config.js';
+import { loadComponents, showToast, formatCurrency, formatDate, setPageTitle, showLoadingRow, hideLoadingRow } from './utils.js';
 
 let currentUser = null;
 let allReceiptsRaw = [];
@@ -171,23 +171,41 @@ function setupEventListeners() {
 
     form.addEventListener('submit', handleSaveReceipt);
 
-    // Attach Edit/Delete Listeners
-    tbody.addEventListener('click', (e) => {
-        const btnEdit = e.target.closest('.btn-edit');
-        const btnDelete = e.target.closest('.btn-delete');
+    // Attach Edit/Delete Listeners — delegated at document for robustness
+    document.addEventListener('click', (e) => {
+        const btnEdit = e.target.closest && e.target.closest('.btn-edit');
+        const btnDelete = e.target.closest && e.target.closest('.btn-delete');
 
         if (btnEdit) {
+            if (btnEdit.disabled) {
+                console.log('[TAX ROAD DEBUG] Receipt Edit clicked but disabled.');
+                return;
+            }
             const tr = btnEdit.closest('tr');
+            if (!tr) return;
             const id = tr.dataset.id;
+            console.log('[TAX ROAD DEBUG] Receipt Edit clicked for id:', id);
             const receipt = allReceiptsRaw.find(r => r.id === id);
             if (receipt) openModalForEdit(receipt);
+            else console.warn('[TAX ROAD WARN] Receipt not found for edit:', id);
         }
 
         if (btnDelete) {
+            if (btnDelete.disabled) {
+                console.log('[TAX ROAD DEBUG] Receipt Delete clicked but disabled.');
+                return;
+            }
             const tr = btnDelete.closest('tr');
+            if (!tr) return;
             const id = tr.dataset.id;
+            console.log('[TAX ROAD DEBUG] Receipt Delete clicked for id:', id);
             const receipt = allReceiptsRaw.find(r => r.id === id);
-            if (receipt) handleDeleteReceipt(receipt);
+            if (receipt) {
+                handleDeleteReceipt(receipt).catch(err => {
+                    console.error('[TAX ROAD ERROR] handleDeleteReceipt failed:', err);
+                    showToast('Failed to delete receipt: ' + (err && err.message ? err.message : ''), 'error');
+                });
+            } else console.warn('[TAX ROAD WARN] Receipt not found for delete:', id);
         }
     });
 
@@ -309,11 +327,10 @@ async function fetchReceipts() {
 
         // Show loading state
         if (tbody) {
-            tbody.innerHTML = `<tr><td colspan="7" class="text-center py-lg"><div class="loader mx-auto"></div><div class="text-muted mt-sm">Loading receipts...</div></td></tr>`;
-            tbody.closest('.table-container').style.opacity = '0.7';
+            showLoadingRow(tbody, 7, 'Loading receipts...');
         }
 
-        const q = query(collection(db, `users/${currentUser.uid}/receipts`));
+        const q = query(collection(db, `users/${currentUser.uid}/receipts`), orderBy('date', 'desc'));
         const snaps = await getDocs(q);
 
         allReceiptsRaw = [];
@@ -322,10 +339,9 @@ async function fetchReceipts() {
         });
 
         console.log(`[TAX ROAD DEBUG] Loaded ${allReceiptsRaw.length} receipts`);
+        // already ordered by date desc from Firestore query
 
-        allReceiptsRaw.sort((a, b) => new Date(b.date) - new Date(a.date));
-
-        if (tbody) tbody.closest('.table-container').style.opacity = '1';
+        if (tbody) hideLoadingRow(tbody);
         renderReceipts(allReceiptsRaw);
     } catch (error) {
         console.error("[TAX ROAD ERROR] Error fetching receipts:", error);

@@ -92,10 +92,16 @@ async function handleOnboardingSubmit(e) {
 
     const businessName = document.getElementById('business-name').value.trim();
     const gstNumber = document.getElementById('gst-number').value.trim();
+    const upiId = document.getElementById('upi-id').value.trim();
     const saveBtn = document.getElementById('save-profile-btn');
 
     if (!businessName) {
         showOnboardingError("Business name is required.");
+        return;
+    }
+
+    if (!upiId) {
+        showOnboardingError("UPI ID is required to generate payment QR codes.");
         return;
     }
 
@@ -107,6 +113,7 @@ async function handleOnboardingSubmit(e) {
         await setDoc(doc(db, 'users', currentUser.uid), {
             businessName: businessName,
             gstNumber: gstNumber || null,
+            upiId: upiId || null,
             email: currentUser.email,
             createdAt: serverTimestamp()
         });

@@ -1,5 +1,5 @@
-import { auth, db, onAuthStateChanged, collection, query, getDocs, where, signOut, doc, getDoc } from './firebase-config.js';
-import { formatCurrency, formatDate, loadComponents, showToast, setPageTitle } from './utils.js';
+import { auth, db, onAuthStateChanged, collection, query, getDocs, where, signOut, doc, getDoc, orderBy } from './firebase-config.js';
+import { formatCurrency, formatDate, loadComponents, showToast, setPageTitle, showLoadingRow, hideLoadingRow } from './utils.js';
 
 let currentUser = null;
 
@@ -74,7 +74,7 @@ async function fetchDashboardData() {
     try {
         // Show loading state
         if (tbody) {
-            tbody.innerHTML = `<tr><td colspan="5" class="text-center py-lg"><div class="loader mx-auto"></div><div class="text-muted mt-sm">Loading...</div></td></tr>`;
+            showLoadingRow(tbody, 5, 'Loading dashboard...');
             if (tableContainer) tableContainer.style.opacity = '0.7';
         }
 
@@ -84,9 +84,9 @@ async function fetchDashboardData() {
 
         // ✅ FIX: Fetch invoices and receipts IN PARALLEL (was sequential before)
         const [invoiceSnaps, receiptSnaps] = await Promise.all([
-            getDocs(query(collection(db, `users/${currentUser.uid}/invoices`), where('createdAt', '>=', isoThirtyDaysAgo))),
+            getDocs(query(collection(db, `users/${currentUser.uid}/invoices`), where('createdAt', '>=', isoThirtyDaysAgo), orderBy('createdAt', 'desc'))),
             // ✅ FIX: Receipts use `date` field (string), createdAt is a Firestore Timestamp — type mismatch fixed
-            getDocs(query(collection(db, `users/${currentUser.uid}/receipts`), where('date', '>=', thirtyDaysAgo.toISOString().split('T')[0])))
+            getDocs(query(collection(db, `users/${currentUser.uid}/receipts`), where('date', '>=', thirtyDaysAgo.toISOString().split('T')[0]), orderBy('date', 'desc')))
         ]);
 
         let totalSales = 0;
@@ -116,8 +116,7 @@ async function fetchDashboardData() {
 
         if (tableContainer) tableContainer.style.opacity = '1';
 
-        // Sort and render top 5 most recent invoices
-        recentInvoices.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+        // Firestore already provided invoices ordered by createdAt descending
         await renderRecentInvoices(recentInvoices.slice(0, 5));
 
     } catch (error) {
