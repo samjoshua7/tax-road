@@ -51,26 +51,142 @@ export function generateId() {
     return Math.random().toString(36).substr(2, 9);
 }
 
+export function setPageTitle(title) {
+    const pageTitle = document.getElementById('page-title');
+    if (pageTitle) {
+        pageTitle.textContent = title;
+        console.log(`[TAX ROAD DEBUG] Page title set to: ${title}`);
+    } else {
+        console.warn('[TAX ROAD WARN] Page title element not found');
+    }
+}
+
 // Load common components (Sidebar, Topnav)
 export async function loadComponents() {
     try {
+        console.log('[TAX ROAD DEBUG] Loading components...');
+
         // Load Sidebar
-        const sidebarHtml = await fetch('components/sidebar.html').then(res => res.text());
-        const sidebarContainer = document.getElementById('sidebar-container');
-        if (sidebarContainer) sidebarContainer.innerHTML = sidebarHtml;
+        try {
+            console.log('[TAX ROAD DEBUG] Fetching sidebar_v2.html...');
+            const version = new Date().getTime();
+            const sidebarResponse = await fetch(`components/sidebar_v2.html?v=${version}`);
+
+            if (!sidebarResponse.ok) {
+                throw new Error(`HTTP ${sidebarResponse.status}: ${sidebarResponse.statusText}`);
+            }
+
+            const sidebarHtml = await sidebarResponse.text();
+            console.log('[TAX ROAD DEBUG] Sidebar HTML fetched, length:', sidebarHtml.length);
+            console.log('[TAX ROAD DEBUG] Sidebar HTML content preview:', sidebarHtml.substring(0, 200));
+
+            // Check if logout button exists in HTML
+            if (sidebarHtml.includes('logout-btn')) {
+                console.log('[TAX ROAD DEBUG] ✓ logout-btn found in sidebar HTML');
+            } else {
+                console.error('[TAX ROAD ERROR] ✗ logout-btn NOT in sidebar HTML - THIS IS THE PROBLEM!');
+            }
+
+            // Check if sidebar-nav exists
+            if (sidebarHtml.includes('sidebar-nav')) {
+                console.log('[TAX ROAD DEBUG] ✓ sidebar-nav found in sidebar HTML');
+            } else {
+                console.error('[TAX ROAD ERROR] ✗ sidebar-nav NOT in sidebar HTML');
+            }
+
+            const sidebarContainer = document.getElementById('sidebar-container');
+
+            if (!sidebarContainer) {
+                console.error('[TAX ROAD ERROR] Sidebar container element not found in DOM');
+            } else {
+                console.log('[TAX ROAD DEBUG] Sidebar container found, inserting HTML...');
+                sidebarContainer.innerHTML = sidebarHtml;
+
+                // Verify insertion
+                console.log('[TAX ROAD DEBUG] Sidebar container innerHTML length:', sidebarContainer.innerHTML.length);
+
+                // Check if logout button now exists in DOM
+                const logoutBtn = document.getElementById('logout-btn');
+                if (logoutBtn) {
+                    console.log('[TAX ROAD DEBUG] ✓ logout-btn FOUND in DOM after insertion');
+                } else {
+                    console.error('[TAX ROAD ERROR] ✗ logout-btn NOT FOUND in DOM - Check sidebar HTML!');
+                }
+
+                // Check all button elements in sidebar
+                const buttons = sidebarContainer.querySelectorAll('button');
+                console.log(`[TAX ROAD DEBUG] Total buttons in sidebar: ${buttons.length}`);
+                buttons.forEach((btn, idx) => {
+                    console.log(`[TAX ROAD DEBUG] Button ${idx}: id="${btn.id}", text="${btn.textContent.trim()}"`);
+                });
+
+                console.log('[TAX ROAD DEBUG] Sidebar loaded successfully');
+            }
+        } catch (sidebarError) {
+            console.error('[TAX ROAD ERROR] Failed to load sidebar:', sidebarError);
+            console.error('[TAX ROAD DEBUG] Make sure components/sidebar.html exists');
+        }
 
         // Load Topnav
-        const topnavHtml = await fetch('components/topnav.html').then(res => res.text());
-        const topnavContainer = document.getElementById('topnav-container');
-        if (topnavContainer) topnavContainer.innerHTML = topnavHtml;
+        try {
+            console.log('[TAX ROAD DEBUG] Fetching topnav.html...');
+            const version = new Date().getTime();
+            const topnavResponse = await fetch(`components/topnav.html?v=${version}`);
+
+            if (!topnavResponse.ok) {
+                throw new Error(`HTTP ${topnavResponse.status}: ${topnavResponse.statusText}`);
+            }
+
+            const topnavHtml = await topnavResponse.text();
+            console.log('[TAX ROAD DEBUG] Topnav HTML fetched, length:', topnavHtml.length);
+            console.log('[TAX ROAD DEBUG] Topnav HTML content preview:', topnavHtml.substring(0, 200));
+
+            const topnavContainer = document.getElementById('topnav-container');
+
+            if (!topnavContainer) {
+                console.error('[TAX ROAD ERROR] Topnav container element not found in DOM');
+            } else {
+                console.log('[TAX ROAD DEBUG] Topnav container found, inserting HTML...');
+                topnavContainer.innerHTML = topnavHtml;
+
+                // Verify insertion
+                console.log('[TAX ROAD DEBUG] Topnav container innerHTML length:', topnavContainer.innerHTML.length);
+
+                // Check if page-title exists
+                const pageTitle = document.getElementById('page-title');
+                if (pageTitle) {
+                    console.log('[TAX ROAD DEBUG] ✓ page-title FOUND in DOM');
+                } else {
+                    console.error('[TAX ROAD ERROR] ✗ page-title NOT FOUND in DOM');
+                }
+
+                console.log('[TAX ROAD DEBUG] Topnav loaded successfully');
+            }
+        } catch (topnavError) {
+            console.error('[TAX ROAD ERROR] Failed to load topnav:', topnavError);
+            console.error('[TAX ROAD DEBUG] Make sure components/topnav.html exists');
+        }
 
         // Init Sidebar active state
-        const currentPath = window.location.pathname.split('/').pop();
-        const navId = currentPath ? `nav-${currentPath.replace('.html', '')}` : 'nav-dashboard';
-        const activeNav = document.getElementById(navId);
-        if (activeNav) activeNav.classList.add('active');
+        try {
+            const currentPath = window.location.pathname.split('/').pop() || 'dashboard.html';
+            const navId = `nav-${currentPath.replace('.html', '')}`;
+
+            console.log(`[TAX ROAD DEBUG] Current path: ${currentPath}, Nav ID to activate: ${navId}`);
+
+            const activeNav = document.getElementById(navId);
+            if (activeNav) {
+                activeNav.classList.add('active');
+                console.log(`[TAX ROAD DEBUG] Activated nav item: ${navId}`);
+            } else {
+                console.warn(`[TAX ROAD WARN] Nav item not found: ${navId}`);
+            }
+        } catch (navError) {
+            console.error('[TAX ROAD ERROR] Failed to set active nav:', navError);
+        }
 
     } catch (error) {
-        console.error('Error loading components:', error);
+        console.error('[TAX ROAD ERROR] Critical error loading components:', error);
     }
 }
+

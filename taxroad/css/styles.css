@@ -49,6 +49,8 @@ body {
 .flex-col { display: flex; flex-direction: column; }
 .gap-sm { gap: var(--spacing-sm); }
 .gap-md { gap: var(--spacing-md); }
+.text-center { text-align: center; }
+.text-sm { font-size: 13px; }
 
 .h-screen { height: 100vh; }
 .w-full { width: 100%; }
@@ -64,6 +66,11 @@ body {
 .p-sm { padding: var(--spacing-sm); }
 .p-md { padding: var(--spacing-md); }
 .p-lg { padding: var(--spacing-lg); }
+.py-sm { padding-top: var(--spacing-sm); padding-bottom: var(--spacing-sm); }
+.py-md { padding-top: var(--spacing-md); padding-bottom: var(--spacing-md); }
+.px-md { padding-left: var(--spacing-md); padding-right: var(--spacing-md); }
+.mt-lg { margin-top: var(--spacing-lg); }
+.pt-md { padding-top: var(--spacing-md); }
 
 .hidden { display: none !important; }
 
@@ -124,6 +131,11 @@ body {
 }
 .btn-outline:hover {
     background-color: var(--bg-light-grey);
+}
+
+.btn-sm {
+    padding: 6px 12px;
+    font-size: 13px;
 }
 
 .icon {

@@ -42,5 +42,6 @@ export {
   where,
   updateDoc,
   deleteDoc,
-  serverTimestamp
+  serverTimestamp,
+  getAuth
 };

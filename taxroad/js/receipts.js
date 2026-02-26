@@ -1,5 +1,5 @@
-import { auth, db, onAuthStateChanged, collection, query, getDocs, addDoc, updateDoc, doc, getDoc, serverTimestamp, writeBatch } from './firebase-config.js';
-import { loadComponents, showToast, formatCurrency, formatDate } from './utils.js';
+import { auth, db, onAuthStateChanged, collection, query, getDocs, addDoc, updateDoc, doc, getDoc, serverTimestamp, signOut } from './firebase-config.js';
+import { loadComponents, showToast, formatCurrency, formatDate, setPageTitle } from './utils.js';
 
 let currentUser = null;
 let allReceiptsRaw = [];
@@ -19,28 +19,50 @@ const amountInput = document.getElementById('receipt-amount');
 
 // Init
 async function initReceipts() {
+    console.log('[TAX ROAD DEBUG] Receipts module loaded, checking auth state...');
     onAuthStateChanged(auth, async (user) => {
         if (!user) {
+            console.log('[TAX ROAD DEBUG] No user logged in, redirecting to login...');
             window.location.href = 'index.html';
             return;
         }
 
+        console.log(`[TAX ROAD DEBUG] User authenticated: ${user.uid}`);
         currentUser = user;
 
+        console.log('[TAX ROAD DEBUG] Loading UI components...');
         await loadComponents();
         setupNavigation();
+        
+        console.log('[TAX ROAD DEBUG] Loading user profile...');
         await loadUserProfile();
 
+        console.log('[TAX ROAD DEBUG] Setting up event listeners...');
         setupEventListeners();
+        
+        console.log('[TAX ROAD DEBUG] Loading customers and invoices reference data...');
         await loadCustomersAndInvoices();
+        
+        console.log('[TAX ROAD DEBUG] Fetching receipts...');
         await fetchReceipts();
     });
 }
 
 function setupNavigation() {
-    const hamburgerBtn = document.getElementById('hamburger-btn');
+    console.log('[TAX ROAD DEBUG] === SETUP NAVIGATION START ===');
+    
+    // Debug: Check sidebar in DOM
     const sidebar = document.getElementById('sidebar-container');
+    console.log('[TAX ROAD DEBUG] Sidebar container exists:', !!sidebar);
+    if (sidebar) {
+        console.log('[TAX ROAD DEBUG] Sidebar innerHTML length:', sidebar.innerHTML.length);
+    }
+    
+    const hamburgerBtn = document.getElementById('hamburger-btn');
     const overlay = document.getElementById('mobile-overlay');
+
+    console.log('[TAX ROAD DEBUG] Hamburger btn found:', !!hamburgerBtn);
+    console.log('[TAX ROAD DEBUG] Overlay found:', !!overlay);
 
     if (hamburgerBtn && sidebar && overlay) {
         hamburgerBtn.addEventListener('click', () => {
@@ -51,42 +73,78 @@ function setupNavigation() {
             sidebar.classList.remove('open');
             overlay.classList.remove('active');
         });
+    } else {
+        console.warn('[TAX ROAD WARN] Hamburger navigation elements not found');
     }
 
+    // Set Page Title
+    setPageTitle('Receipts');
+
+    // CRITICAL: Debug logout button
+    console.log('[TAX ROAD DEBUG] === SEARCHING FOR LOGOUT BUTTON ===');
     const logoutBtn = document.getElementById('logout-btn');
+    console.log('[TAX ROAD DEBUG] Logout button found:', !!logoutBtn);
+    
     if (logoutBtn) {
-        logoutBtn.addEventListener('click', async () => await signOut(auth));
+        console.log('[TAX ROAD DEBUG] ✓ Logout button FOUND - Adding click listener');
+        logoutBtn.addEventListener('click', async () => {
+            try {
+                console.log('[TAX ROAD DEBUG] Logging out user...');
+                await signOut(auth);
+                console.log('[TAX ROAD DEBUG] Logout successful');
+            } catch (error) {
+                console.error('[TAX ROAD ERROR] Logout Error:', error);
+                showToast("Error during logout", "error");
+            }
+        });
+    } else {
+        console.error('[TAX ROAD ERROR] ✗ Logout button NOT found');
+        console.error('[TAX ROAD DEBUG] Sidebar HTML search for "logout":', 
+            sidebar?.innerHTML?.includes('logout') ? '✓ FOUND' : '✗ NOT FOUND');
     }
 
     const searchInputInst = document.getElementById('global-search');
     if (searchInputInst) {
         searchInputInst.addEventListener('input', (e) => {
+            console.log(`[TAX ROAD DEBUG] Searching receipts for: ${e.target.value}`);
             filterReceipts(e.target.value);
         });
+    } else {
+        console.warn('[TAX ROAD WARN] Search input not found');
     }
+    
+    console.log('[TAX ROAD DEBUG] === SETUP NAVIGATION END ===\n');
 }
 
 async function loadUserProfile() {
     try {
+        console.log('[TAX ROAD DEBUG] Fetching user profile from Firestore...');
         const userDoc = await getDoc(doc(db, 'users', currentUser.uid));
         if (userDoc.exists()) {
             const userData = userDoc.data();
+            console.log('[TAX ROAD DEBUG] User profile loaded:', userData.businessName);
             const nameDisplay = document.getElementById('user-display-name');
             if (nameDisplay && userData.businessName) {
                 nameDisplay.textContent = userData.businessName;
                 nameDisplay.style.display = 'block';
             }
+        } else {
+            console.warn('[TAX ROAD WARN] No user profile found in Firestore');
         }
-    } catch (e) { console.error(e); }
+    } catch (e) { 
+        console.error('[TAX ROAD ERROR] Error loading user profile:', e); 
+    }
 }
 
 async function loadCustomersAndInvoices() {
     try {
+        console.log('[TAX ROAD DEBUG] Loading customers and invoices reference data...');
         // Load Customers for names
         const cQ = query(collection(db, `users/${currentUser.uid}/customers`));
         const cSnaps = await getDocs(cQ);
         customerMap = {};
         cSnaps.forEach(snap => { customerMap[snap.id] = snap.data().partyName; });
+        console.log(`[TAX ROAD DEBUG] Loaded ${cSnaps.size} customers for reference`);
 
         // Load Invoices
         const iQ = query(collection(db, `users/${currentUser.uid}/invoices`));
@@ -105,8 +163,10 @@ async function loadCustomersAndInvoices() {
             }
         });
 
+        console.log(`[TAX ROAD DEBUG] Loaded ${iSnaps.size} invoices, ${pendingInvoices.length} pending payment`);
+
     } catch (e) {
-        console.error("Error loading reference data", e);
+        console.error("[TAX ROAD ERROR] Error loading reference data", e);
     }
 }
 
@@ -188,6 +248,7 @@ function closeModal() {
 
 async function fetchReceipts() {
     try {
+        console.log('[TAX ROAD DEBUG] Fetching receipts from Firestore...');
         const q = query(collection(db, `users/${currentUser.uid}/receipts`));
         const snaps = await getDocs(q);
 
@@ -196,11 +257,13 @@ async function fetchReceipts() {
             allReceiptsRaw.push({ id: snap.id, ...snap.data() });
         });
 
+        console.log(`[TAX ROAD DEBUG] Loaded ${allReceiptsRaw.length} receipts`);
+
         allReceiptsRaw.sort((a, b) => new Date(b.date) - new Date(a.date));
 
         renderReceipts(allReceiptsRaw);
     } catch (error) {
-        console.error("Error fetching receipts:", error);
+        console.error("[TAX ROAD ERROR] Error fetching receipts:", error);
         showToast("Failed to load receipts.", "error");
         tbody.innerHTML = `<tr><td colspan="5" class="text-center text-error">Failed to load data</td></tr>`;
     }

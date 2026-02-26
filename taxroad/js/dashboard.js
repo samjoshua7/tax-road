@@ -1,36 +1,50 @@
 import { auth, db, onAuthStateChanged, collection, query, getDocs, where, signOut, doc, getDoc } from './firebase-config.js';
-import { formatCurrency, formatDate, loadComponents, showToast } from './utils.js';
+import { formatCurrency, formatDate, loadComponents, showToast, setPageTitle } from './utils.js';
 
 let currentUser = null;
 
 // Initialize Dashboard
 async function initDashboard() {
+    console.log('[TAX ROAD DEBUG] Dashboard module loaded, checking auth state...');
     // 1. Check Auth State First
     onAuthStateChanged(auth, async (user) => {
         if (!user) {
+            console.log('[TAX ROAD DEBUG] No user logged in, redirecting to login...');
             window.location.href = 'index.html';
             return;
         }
 
+        console.log(`[TAX ROAD DEBUG] User authenticated: ${user.uid}`);
         currentUser = user;
 
         // 2. Load UI Components (Sidebar, Topnav)
+        console.log('[TAX ROAD DEBUG] Loading UI components...');
         await loadComponents();
         setupNavigation();
 
         // 3. Load User Profile (for Topnav Display)
+        console.log('[TAX ROAD DEBUG] Loading user profile...');
         await loadUserProfile();
 
         // 4. Fetch Dashboard Data
+        console.log('[TAX ROAD DEBUG] Fetching dashboard data...');
         await fetchDashboardData();
     });
 }
 
 function setupNavigation() {
+    console.log('[TAX ROAD DEBUG] === SETUP NAVIGATION START ===');
+    
+    // Debug: Check sidebar in DOM
+    const sidebar = document.getElementById('sidebar-container');
+    console.log('[TAX ROAD DEBUG] Sidebar container exists:', !!sidebar);
+    
     // Mobile Hamburger
     const hamburgerBtn = document.getElementById('hamburger-btn');
-    const sidebar = document.getElementById('sidebar-container');
     const overlay = document.getElementById('mobile-overlay');
+
+    console.log('[TAX ROAD DEBUG] Hamburger btn found:', !!hamburgerBtn);
+    console.log('[TAX ROAD DEBUG] Overlay found:', !!overlay);
 
     if (hamburgerBtn && sidebar && overlay) {
         hamburgerBtn.addEventListener('click', () => {
@@ -42,35 +56,56 @@ function setupNavigation() {
             sidebar.classList.remove('open');
             overlay.classList.remove('active');
         });
+    } else {
+        console.warn('[TAX ROAD WARN] Hamburger navigation elements not found');
     }
 
-    // Logout Button
+    // Set Page Title
+    setPageTitle('Dashboard Overview');
+
+    // CRITICAL: Debug logout button
+    console.log('[TAX ROAD DEBUG] === SEARCHING FOR LOGOUT BUTTON ===');
     const logoutBtn = document.getElementById('logout-btn');
+    console.log('[TAX ROAD DEBUG] Logout button found:', !!logoutBtn);
+    
     if (logoutBtn) {
+        console.log('[TAX ROAD DEBUG] ✓ Logout button FOUND - Adding click listener');
         logoutBtn.addEventListener('click', async () => {
             try {
+                console.log('[TAX ROAD DEBUG] Logging out user...');
                 await signOut(auth);
+                console.log('[TAX ROAD DEBUG] Logout successful');
             } catch (error) {
-                console.error("Logout Error:", error);
+                console.error("[TAX ROAD ERROR] Logout Error:", error);
                 showToast("Error during logout", "error");
             }
         });
+    } else {
+        console.error('[TAX ROAD ERROR] ✗ Logout button NOT found');
+        console.error('[TAX ROAD DEBUG] Sidebar HTML search for "logout":', 
+            sidebar?.innerHTML?.includes('logout') ? '✓ FOUND' : '✗ NOT FOUND');
     }
+    
+    console.log('[TAX ROAD DEBUG] === SETUP NAVIGATION END ===\n');
 }
 
 async function loadUserProfile() {
     try {
+        console.log('[TAX ROAD DEBUG] Fetching user profile from Firestore...');
         const userDoc = await getDoc(doc(db, 'users', currentUser.uid));
         if (userDoc.exists()) {
             const userData = userDoc.data();
+            console.log('[TAX ROAD DEBUG] User profile loaded:', userData.businessName);
             const nameDisplay = document.getElementById('user-display-name');
             if (nameDisplay && userData.businessName) {
                 nameDisplay.textContent = userData.businessName;
                 nameDisplay.style.display = 'block';
             }
+        } else {
+            console.warn('[TAX ROAD WARN] No user profile found in Firestore');
         }
     } catch (error) {
-        console.error("Error loading user profile:", error);
+        console.error("[TAX ROAD ERROR] Error loading user profile:", error);
     }
 }
 
