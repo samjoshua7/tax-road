@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tax Road - Receipts</title>
+    <link rel="stylesheet" href="css/styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+
+<body>
+    <div class="app-container">
+        <!-- Sidebar Shell -->
+        <aside class="sidebar" id="sidebar-container"></aside>
+
+        <!-- Mobile Overlay -->
+        <div class="overlay" id="mobile-overlay"></div>
+
+        <main class="main-content">
+            <!-- Top Nav Shell -->
+            <header class="topnav" id="topnav-container"></header>
+
+            <div class="content-area">
+                <div class="flex-between mb-lg flex-wrap gap-md">
+                    <h2 class="text-primary">Receipts</h2>
+                    <button class="btn btn-primary flex-center gap-sm" id="btn-add-receipt">
+                        <svg class="icon" viewBox="0 0 24 24">
+                            <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z" />
+                        </svg>
+                        Record Payment
+                    </button>
+                </div>
+
+                <div class="rounded-card bg-white p-lg soft-shadow">
+                    <div class="table-container">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Invoice #</th>
+                                    <th>Customer</th>
+                                    <th>Mode</th>
+                                    <th>Amount Received</th>
+                                </tr>
+                            </thead>
+                            <tbody id="receipts-body">
+                                <tr>
+                                    <td colspan="5" class="text-center text-muted py-md">Loading receipts...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Record Payment Modal -->
+    <div class="modal-overlay" id="receipt-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="text-primary">Record Payment</h3>
+                <button class="modal-close" id="modal-close">&times;</button>
+            </div>
+
+            <form id="receipt-form">
+
+                <div class="form-group">
+                    <label class="form-label">Select Invoice *</label>
+                    <select id="receipt-invoice" class="form-control" required>
+                        <option value="">Choose an invoice...</option>
+                        <!-- Populated dynamically -->
+                    </select>
+                </div>
+
+                <div id="invoice-balance-info" class="flex-between py-sm px-md rounded-card bg-light-grey mb-md hidden">
+                    <div class="flex flex-col">
+                        <span class="text-muted text-sm">Invoice Total</span>
+                        <span class="font-bold" id="info-total">₹0.00</span>
+                    </div>
+                    <div class="flex flex-col text-right">
+                        <span class="text-muted text-sm">Pending Balance</span>
+                        <span class="font-bold text-accent" id="info-balance">₹0.00</span>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Amount Received *</label>
+                    <input type="number" id="receipt-amount" class="form-control" min="0.01" step="0.01" required
+                        placeholder="Enter amount">
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Payment Mode *</label>
+                    <select id="receipt-mode" class="form-control" required>
+                        <option value="Cash">Cash</option>
+                        <option value="Bank Transfer">Bank Transfer / NEFT</option>
+                        <option value="UPI">UPI</option>
+                        <option value="Cheque">Cheque</option>
+                        <option value="Credit Card">Credit Card</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Date *</label>
+                    <input type="date" id="receipt-date" class="form-control" required>
+                </div>
+
+                <div class="flex-between mt-lg">
+                    <button type="button" class="btn btn-outline" id="btn-cancel">Cancel</button>
+                    <button type="submit" class="btn btn-primary flex-center gap-sm" id="btn-save">
+                        <svg class="icon" viewBox="0 0 24 24">
+                            <path
+                                d="M17 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V7l-4-4zm-5 16c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm3-10H5V5h10v4z" />
+                        </svg>
+                        Save Receipt
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Firebase SDK (Modular) -->
+    <script type="module" src="js/firebase-config.js"></script>
+    <script type="module" src="js/utils.js"></script>
+    <script type="module" src="js/receipts.js"></script>
+</body>
+
+</html>

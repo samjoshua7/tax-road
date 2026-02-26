@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tax Road - Dashboard</title>
+    <link rel="stylesheet" href="css/styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+
+<body>
+    <div class="app-container">
+        <!-- Sidebar Shell -->
+        <aside class="sidebar" id="sidebar-container"></aside>
+
+        <!-- Mobile Overlay -->
+        <div class="overlay" id="mobile-overlay"></div>
+
+        <main class="main-content">
+            <!-- Top Nav Shell -->
+            <header class="topnav" id="topnav-container"></header>
+
+            <div class="content-area">
+                <div class="flex-between mb-lg">
+                    <h2 class="text-primary">Dashboard Overview</h2>
+                    <span class="text-muted text-sm">Last 30 Days</span>
+                </div>
+
+                <!-- Stat Cards -->
+                <div class="dashboard-grid">
+                    <div class="stat-card">
+                        <div class="stat-title">Total Sales (30d)</div>
+                        <div class="stat-value" id="stat-sales">₹0.00</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-title">Total GST Collected</div>
+                        <div class="stat-value" id="stat-gst">₹0.00</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-title">Total Income (Receipts)</div>
+                        <div class="stat-value" id="stat-income">₹0.00</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-title">Net Profit (Income - GST)</div>
+                        <div class="stat-value" id="stat-profit">₹0.00</div>
+                    </div>
+                </div>
+
+                <!-- Recent Activity -->
+                <div class="rounded-card bg-white p-lg soft-shadow mt-lg">
+                    <div class="flex-between mb-md">
+                        <h3 class="text-primary font-bold">Recent Invoices</h3>
+                        <a href="invoices.html" class="btn btn-outline btn-sm">View All</a>
+                    </div>
+
+                    <div class="table-container">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Invoice #</th>
+                                    <th>Customer</th>
+                                    <th>Date</th>
+                                    <th>Amount</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody id="recent-invoices-body">
+                                <tr>
+                                    <td colspan="5" class="text-center text-muted py-md">Loading...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Firebase SDK (Modular) -->
+    <script type="module" src="js/firebase-config.js"></script>
+    <script type="module" src="js/utils.js"></script>
+    <script type="module" src="js/dashboard.js"></script>
+</body>
+
+</html>

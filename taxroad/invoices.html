@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tax Road - Invoices</title>
+    <link rel="stylesheet" href="css/styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        .invoice-items-header {
+            display: grid;
+            grid-template-columns: 2fr 1fr 1fr 1fr auto;
+            gap: 8px;
+            font-weight: 600;
+            font-size: 12px;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            margin-bottom: 8px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        @media (max-width: 768px) {
+            .invoice-items-header {
+                display: none;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="app-container">
+        <!-- Sidebar Shell -->
+        <aside class="sidebar" id="sidebar-container"></aside>
+
+        <!-- Mobile Overlay -->
+        <div class="overlay" id="mobile-overlay"></div>
+
+        <main class="main-content">
+            <!-- Top Nav Shell -->
+            <header class="topnav" id="topnav-container"></header>
+
+            <div class="content-area">
+                <div class="flex-between mb-lg flex-wrap gap-md">
+                    <h2 class="text-primary">Invoices</h2>
+                    <button class="btn btn-primary flex-center gap-sm" id="btn-create-invoice">
+                        <svg class="icon" viewBox="0 0 24 24">
+                            <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z" />
+                        </svg>
+                        Create Invoice
+                    </button>
+                </div>
+
+                <div class="rounded-card bg-white p-lg soft-shadow">
+                    <div class="table-container">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Invoice #</th>
+                                    <th>Customer</th>
+                                    <th>Date</th>
+                                    <th>Amount</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="invoices-body">
+                                <tr>
+                                    <td colspan="6" class="text-center text-muted py-md">Loading invoices...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Create/Edit Invoice Modal -->
+    <div class="modal-overlay" id="invoice-modal">
+        <div class="modal-content large">
+            <div class="modal-header">
+                <h3 class="text-primary" id="modal-title">Create Invoice</h3>
+                <button class="modal-close" id="modal-close">&times;</button>
+            </div>
+
+            <form id="invoice-form">
+                <input type="hidden" id="invoice-id">
+
+                <div class="flex gap-md mb-md flex-wrap">
+                    <div class="form-group" style="flex: 1; min-width: 250px;">
+                        <label class="form-label">Customer *</label>
+                        <select id="inv-customer" class="form-control" required>
+                            <option value="">Select Customer</option>
+                            <!-- Dynamically populated -->
+                        </select>
+                    </div>
+
+                    <div class="form-group" style="flex: 1; min-width: 250px;">
+                        <label class="form-label">Invoice Number *</label>
+                        <input type="text" id="inv-number" class="form-control" required readonly
+                            placeholder="Auto-generated">
+                    </div>
+
+                    <div class="form-group" style="flex: 1; min-width: 250px;">
+                        <label class="form-label">Date *</label>
+                        <input type="date" id="inv-date" class="form-control" required>
+                    </div>
+                </div>
+
+                <div class="mb-md">
+                    <div class="flex-between mb-sm">
+                        <h4 class="text-primary">Line Items</h4>
+                        <button type="button" class="btn btn-outline btn-sm" id="btn-add-item">
+                            + Add Item
+                        </button>
+                    </div>
+
+                    <div class="invoice-items-header">
+                        <div>Item Name</div>
+                        <div>Qty</div>
+                        <div>Price</div>
+                        <div>GST %</div>
+                        <div style="width: 36px;"></div> <!-- Delete space -->
+                    </div>
+
+                    <div id="invoice-items-container">
+                        <!-- Items populated dynamically -->
+                    </div>
+                </div>
+
+                <!-- Totals -->
+                <div class="flex flex-col gap-sm mt-lg pt-md"
+                    style="border-top: 1px solid var(--border); max-width: 300px; margin-left: auto;">
+                    <div class="flex-between">
+                        <span class="text-muted">Subtotal:</span>
+                        <span class="font-bold" id="inv-subtotal">₹0.00</span>
+                    </div>
+                    <div class="flex-between">
+                        <span class="text-muted">GST Amount:</span>
+                        <span class="font-bold" id="inv-gst">₹0.00</span>
+                    </div>
+                    <div class="flex-between" style="font-size: 18px;">
+                        <span class="text-primary font-bold">Total:</span>
+                        <span class="text-primary font-bold" id="inv-total">₹0.00</span>
+                    </div>
+                </div>
+
+                <div class="flex-between mt-lg">
+                    <button type="button" class="btn btn-outline" id="btn-cancel">Cancel</button>
+                    <button type="submit" class="btn btn-primary flex-center gap-sm" id="btn-save">
+                        <svg class="icon" viewBox="0 0 24 24">
+                            <path
+                                d="M17 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V7l-4-4zm-5 16c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm3-10H5V5h10v4z" />
+                        </svg>
+                        Save Invoice
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Firebase SDK (Modular) -->
+    <script type="module" src="js/firebase-config.js"></script>
+    <script type="module" src="js/utils.js"></script>
+    <script type="module" src="js/invoices.js"></script>
+</body>
+
+</html>
