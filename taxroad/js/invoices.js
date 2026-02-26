@@ -1,4 +1,4 @@
-import { auth, db, onAuthStateChanged, collection, query, getDocs, addDoc, updateDoc, doc, deleteDoc, serverTimestamp, getDoc, signOut } from './firebase-config.js';
+import { auth, db, onAuthStateChanged, collection, query, getDocs, addDoc, updateDoc, doc, deleteDoc, serverTimestamp, getDoc, signOut, where, runTransaction } from './firebase-config.js';
 import { loadComponents, showToast, formatCurrency, formatDate, setPageTitle } from './utils.js';
 
 let currentUser = null;
@@ -21,43 +21,34 @@ const customerSelect = document.getElementById('inv-customer');
 
 // Initialize
 async function initInvoices() {
-    console.log('[TAX ROAD DEBUG] Invoices module loaded, checking auth state...');
     onAuthStateChanged(auth, async (user) => {
         if (!user) {
-            console.log('[TAX ROAD DEBUG] No user logged in, redirecting to login...');
             window.location.href = 'index.html';
             return;
         }
 
-        console.log(`[TAX ROAD DEBUG] User authenticated: ${user.uid}`);
         currentUser = user;
 
-        console.log('[TAX ROAD DEBUG] Loading UI components...');
         await loadComponents();
         setupNavigation();
-        
-        console.log('[TAX ROAD DEBUG] Loading user profile...');
-        await loadUserProfile();
-
-        console.log('[TAX ROAD DEBUG] Setting up event listeners...');
         setupEventListeners();
-        
-        console.log('[TAX ROAD DEBUG] Loading customers and invoices...');
-        await loadCustomers(); // Important: load this before invoices
+
+        // Load profile and customers in parallel — customers must finish before fetchInvoices for the map to be ready
+        await Promise.all([loadUserProfile(), loadCustomers()]);
         await fetchInvoices();
     });
 }
 
 function setupNavigation() {
     console.log('[TAX ROAD DEBUG] === SETUP NAVIGATION START ===');
-    
+
     // Debug: Check sidebar in DOM
     const sidebar = document.getElementById('sidebar-container');
     console.log('[TAX ROAD DEBUG] Sidebar container exists:', !!sidebar);
     if (sidebar) {
         console.log('[TAX ROAD DEBUG] Sidebar innerHTML length:', sidebar.innerHTML.length);
     }
-    
+
     const hamburgerBtn = document.getElementById('hamburger-btn');
     const overlay = document.getElementById('mobile-overlay');
 
@@ -84,7 +75,7 @@ function setupNavigation() {
     console.log('[TAX ROAD DEBUG] === SEARCHING FOR LOGOUT BUTTON ===');
     const logoutBtn = document.getElementById('logout-btn');
     console.log('[TAX ROAD DEBUG] Logout button found:', !!logoutBtn);
-    
+
     if (logoutBtn) {
         console.log('[TAX ROAD DEBUG] ✓ Logout button FOUND - Adding click listener');
         logoutBtn.addEventListener('click', async () => {
@@ -99,7 +90,7 @@ function setupNavigation() {
         });
     } else {
         console.error('[TAX ROAD ERROR] ✗ Logout button NOT found');
-        console.error('[TAX ROAD DEBUG] Sidebar HTML search for "logout":', 
+        console.error('[TAX ROAD DEBUG] Sidebar HTML search for "logout":',
             sidebar?.innerHTML?.includes('logout') ? '✓ FOUND' : '✗ NOT FOUND');
     }
 
@@ -112,7 +103,7 @@ function setupNavigation() {
     } else {
         console.warn('[TAX ROAD WARN] Search input not found');
     }
-    
+
     console.log('[TAX ROAD DEBUG] === SETUP NAVIGATION END ===\n');
 }
 
@@ -131,8 +122,8 @@ async function loadUserProfile() {
         } else {
             console.warn('[TAX ROAD WARN] No user profile found in Firestore');
         }
-    } catch (e) { 
-        console.error('[TAX ROAD ERROR] Error loading user profile:', e); 
+    } catch (e) {
+        console.error('[TAX ROAD ERROR] Error loading user profile:', e);
     }
 }
 
@@ -168,9 +159,8 @@ async function loadCustomers() {
 }
 
 function setupEventListeners() {
-    btnCreate.addEventListener('click', async () => {
-        const nextInvNum = await generateInvoiceNumber();
-        openModal(null, nextInvNum);
+    btnCreate.addEventListener('click', () => {
+        openModal(null, "Auto-generated upon save");
     });
     btnClose.addEventListener('click', closeModal);
     btnCancel.addEventListener('click', closeModal);
@@ -202,25 +192,25 @@ function setupEventListeners() {
     });
 }
 
-async function generateInvoiceNumber() {
-    try {
-        // Find highest invoice number
-        // Simple sequential format for MVP: INV-0001
-        let maxNum = 0;
-        allInvoicesRaw.forEach(inv => {
-            if (inv.invoiceNumber && inv.invoiceNumber.startsWith('INV-')) {
-                const numPart = parseInt(inv.invoiceNumber.replace('INV-', ''), 10);
-                if (!isNaN(numPart) && numPart > maxNum) {
-                    maxNum = numPart;
-                }
-            }
-        });
+async function generateSafeInvoiceNumber() {
+    console.log('[TAX ROAD DEBUG] Generating safe transaction-based invoice number...');
+    const counterRef = doc(db, `users/${currentUser.uid}/counters/invoices`);
+    let newSequence = 1;
 
-        return `INV-${String(maxNum + 1).padStart(4, '0')}`;
-    } catch (e) {
-        console.error(e);
-        return `INV-${Date.now().toString().slice(-4)}`; // Fallback
-    }
+    await runTransaction(db, async (transaction) => {
+        const counterDoc = await transaction.get(counterRef);
+        if (!counterDoc.exists()) {
+            // First ever invoice
+            transaction.set(counterRef, { currentCount: 1 });
+            newSequence = 1;
+        } else {
+            const data = counterDoc.data();
+            newSequence = (data.currentCount || 0) + 1;
+            transaction.update(counterRef, { currentCount: newSequence });
+        }
+    });
+
+    return `INV-${String(newSequence).padStart(4, '0')}`;
 }
 
 function openModal(invoice = null, prefilledNumber = '') {
@@ -322,6 +312,13 @@ function calculateTotals() {
 async function fetchInvoices() {
     try {
         console.log('[TAX ROAD DEBUG] Fetching invoices from Firestore...');
+
+        // Show loading state
+        if (tbody) {
+            tbody.innerHTML = `<tr><td colspan="6" class="text-center py-lg"><div class="loader mx-auto"></div><div class="text-muted mt-sm">Loading invoices...</div></td></tr>`;
+            tbody.closest('.table-container').style.opacity = '0.7';
+        }
+
         const invoicesRef = collection(db, `users/${currentUser.uid}/invoices`);
         const q = query(invoicesRef);
         const snaps = await getDocs(q);
@@ -336,11 +333,15 @@ async function fetchInvoices() {
         // Sort by date desc
         allInvoicesRaw.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
+        if (tbody) tbody.closest('.table-container').style.opacity = '1';
         renderInvoices(allInvoicesRaw);
     } catch (error) {
         console.error("[TAX ROAD ERROR] Error fetching invoices:", error);
         showToast("Failed to load invoices.", "error");
-        tbody.innerHTML = `<tr><td colspan="6" class="text-center text-error">Failed to load data</td></tr>`;
+        if (tbody) {
+            tbody.closest('.table-container').style.opacity = '1';
+            tbody.innerHTML = `<tr><td colspan="6" class="text-center text-error">Failed to load data</td></tr>`;
+        }
     }
 }
 
@@ -458,14 +459,12 @@ async function handleSaveInvoice(e) {
 
     const invoiceData = {
         customerId,
-        invoiceNumber: invNumber,
         items,
         subtotal,
         gstAmount,
         total,
         // Convert yyyy-mm-dd to ISO UTC for consistency, or store as string if parsing is needed
-        createdAt: new Date(invDateStr).toISOString(),
-        status: id ? undefined : 'Pending' // Only set status on create, update shouldn't overwrite unless intended
+        createdAt: new Date(invDateStr).toISOString()
     };
 
     try {
@@ -475,9 +474,10 @@ async function handleSaveInvoice(e) {
         const invRef = collection(db, `users/${currentUser.uid}/invoices`);
 
         if (id) {
-            // Keep existing status
+            // Update
             const existingInv = allInvoicesRaw.find(i => i.id === id);
             invoiceData.status = existingInv.status || 'Pending';
+            invoiceData.invoiceNumber = existingInv.invoiceNumber; // Ensure number doesn't disappear
 
             const docRef = doc(db, `users/${currentUser.uid}/invoices`, id);
             await updateDoc(docRef, {
@@ -486,6 +486,11 @@ async function handleSaveInvoice(e) {
             });
             showToast("Invoice updated successfully");
         } else {
+            // Create New - Lock transaction and assign number
+            const finalInvNum = await generateSafeInvoiceNumber();
+            invoiceData.status = 'Pending';
+            invoiceData.invoiceNumber = finalInvNum;
+
             await addDoc(invRef, {
                 ...invoiceData
             });
@@ -512,8 +517,18 @@ async function handleDelete(invoice) {
         return;
     }
 
-
+    // CHECK RULE 2: Invoice cannot be deleted if receipts exist
     try {
+        const receiptsRef = collection(db, `users/${currentUser.uid}/receipts`);
+        const q = query(receiptsRef, where("invoiceId", "==", invoice.id));
+        const snaps = await getDocs(q);
+
+        if (!snaps.empty) {
+            showToast("Invoice cannot be deleted because receipts are linked.", "error");
+            return;
+        }
+
+        // Proceed with deletion since receipt_count == 0
         const docRef = doc(db, `users/${currentUser.uid}/invoices`, invoice.id);
         await deleteDoc(docRef);
         showToast("Invoice deleted successfully");

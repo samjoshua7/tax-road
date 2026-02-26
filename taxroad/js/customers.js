@@ -17,35 +17,26 @@ const modalTitle = document.getElementById('modal-title');
 
 // Initialize
 async function initCustomers() {
-    console.log('[TAX ROAD DEBUG] Customers module loaded, checking auth state...');
     onAuthStateChanged(auth, async (user) => {
         if (!user) {
-            console.log('[TAX ROAD DEBUG] No user logged in, redirecting to login...');
             window.location.href = 'index.html';
             return;
         }
 
-        console.log(`[TAX ROAD DEBUG] User authenticated: ${user.uid}`);
         currentUser = user;
 
-        console.log('[TAX ROAD DEBUG] Loading UI components...');
         await loadComponents();
         setupNavigation();
-        
-        console.log('[TAX ROAD DEBUG] Loading user profile...');
-        await loadUserProfile();
-
-        console.log('[TAX ROAD DEBUG] Setting up event listeners...');
         setupEventListeners();
-        
-        console.log('[TAX ROAD DEBUG] Fetching customers...');
-        await fetchCustomers();
+
+        // Profile and data load in parallel
+        await Promise.all([loadUserProfile(), fetchCustomers()]);
     });
 }
 
 function setupNavigation() {
     console.log('[TAX ROAD DEBUG] === SETUP NAVIGATION START ===');
-    
+
     // Debug: Check sidebar in DOM
     const sidebar = document.getElementById('sidebar-container');
     console.log('[TAX ROAD DEBUG] Sidebar container exists:', !!sidebar);
@@ -53,7 +44,7 @@ function setupNavigation() {
         console.log('[TAX ROAD DEBUG] Sidebar innerHTML length:', sidebar.innerHTML.length);
         console.log('[TAX ROAD DEBUG] Sidebar innerHTML:', sidebar.innerHTML.substring(0, 300));
     }
-    
+
     const hamburgerBtn = document.getElementById('hamburger-btn');
     const overlay = document.getElementById('mobile-overlay');
 
@@ -80,7 +71,7 @@ function setupNavigation() {
     console.log('[TAX ROAD DEBUG] === SEARCHING FOR LOGOUT BUTTON ===');
     const logoutBtn = document.getElementById('logout-btn');
     console.log('[TAX ROAD DEBUG] Logout button found:', !!logoutBtn);
-    
+
     if (logoutBtn) {
         console.log('[TAX ROAD DEBUG] ✓ Logout button FOUND - Adding click listener');
         console.log('[TAX ROAD DEBUG] Button element:', logoutBtn.tagName, 'id=' + logoutBtn.id, 'text=' + logoutBtn.textContent);
@@ -101,7 +92,7 @@ function setupNavigation() {
         allButtons.forEach((btn, idx) => {
             console.error(`[TAX ROAD DEBUG]   Button ${idx}: id="${btn.id}", class="${btn.className}", text="${btn.textContent.trim()}"`);
         });
-        console.error('[TAX ROAD DEBUG] Sidebar HTML search for "logout":', 
+        console.error('[TAX ROAD DEBUG] Sidebar HTML search for "logout":',
             sidebar?.innerHTML?.includes('logout') ? '✓ FOUND' : '✗ NOT FOUND');
     }
 
@@ -115,7 +106,7 @@ function setupNavigation() {
     } else {
         console.warn('[TAX ROAD WARN] Search input not found');
     }
-    
+
     console.log('[TAX ROAD DEBUG] === SETUP NAVIGATION END ===\n');
 }
 
@@ -134,8 +125,8 @@ async function loadUserProfile() {
         } else {
             console.warn('[TAX ROAD WARN] No user profile found in Firestore');
         }
-    } catch (e) { 
-        console.error('[TAX ROAD ERROR] Error loading user profile:', e); 
+    } catch (e) {
+        console.error('[TAX ROAD ERROR] Error loading user profile:', e);
     }
 }
 
@@ -176,6 +167,13 @@ function closeModal() {
 async function fetchCustomers() {
     try {
         console.log('[TAX ROAD DEBUG] Fetching customers from Firestore...');
+
+        // Show loading state
+        if (tbody) {
+            tbody.innerHTML = `<tr><td colspan="5" class="text-center py-lg"><div class="loader mx-auto"></div><div class="text-muted mt-sm">Loading customers...</div></td></tr>`;
+            tbody.closest('.table-container').style.opacity = '0.7';
+        }
+
         const customersRef = collection(db, `users/${currentUser.uid}/customers`);
         // Simple order by party name might require index, fetching all and sorting client side for MVP
         const q = query(customersRef);
@@ -191,11 +189,15 @@ async function fetchCustomers() {
         // Sort alphabetically
         allCustomersRaw.sort((a, b) => a.partyName.localeCompare(b.partyName));
 
+        if (tbody) tbody.closest('.table-container').style.opacity = '1';
         renderCustomers(allCustomersRaw);
     } catch (error) {
         console.error("[TAX ROAD ERROR] Error fetching customers:", error);
         showToast("Failed to load customers.", "error");
-        tbody.innerHTML = `<tr><td colspan="5" class="text-center text-error">Failed to load data</td></tr>`;
+        if (tbody) {
+            tbody.closest('.table-container').style.opacity = '1';
+            tbody.innerHTML = `<tr><td colspan="5" class="text-center text-error">Failed to load data</td></tr>`;
+        }
     }
 }
 

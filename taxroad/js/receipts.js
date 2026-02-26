@@ -1,4 +1,4 @@
-import { auth, db, onAuthStateChanged, collection, query, getDocs, addDoc, updateDoc, doc, getDoc, serverTimestamp, signOut } from './firebase-config.js';
+import { auth, db, onAuthStateChanged, collection, query, getDocs, addDoc, updateDoc, deleteDoc, doc, getDoc, serverTimestamp, signOut, runTransaction, where } from './firebase-config.js';
 import { loadComponents, showToast, formatCurrency, formatDate, setPageTitle } from './utils.js';
 
 let currentUser = null;
@@ -10,6 +10,7 @@ let customerMap = {}; // id -> name
 // DOM
 const tbody = document.getElementById('receipts-body');
 const modal = document.getElementById('receipt-modal');
+const modalTitle = document.getElementById('modal-title');   // ✅ FIX: was missing, caused ReferenceError
 const form = document.getElementById('receipt-form');
 const btnAdd = document.getElementById('btn-add-receipt');
 const btnClose = document.getElementById('modal-close');
@@ -19,45 +20,35 @@ const amountInput = document.getElementById('receipt-amount');
 
 // Init
 async function initReceipts() {
-    console.log('[TAX ROAD DEBUG] Receipts module loaded, checking auth state...');
     onAuthStateChanged(auth, async (user) => {
         if (!user) {
-            console.log('[TAX ROAD DEBUG] No user logged in, redirecting to login...');
             window.location.href = 'index.html';
             return;
         }
 
-        console.log(`[TAX ROAD DEBUG] User authenticated: ${user.uid}`);
         currentUser = user;
 
-        console.log('[TAX ROAD DEBUG] Loading UI components...');
         await loadComponents();
         setupNavigation();
-        
-        console.log('[TAX ROAD DEBUG] Loading user profile...');
-        await loadUserProfile();
 
-        console.log('[TAX ROAD DEBUG] Setting up event listeners...');
+        // Load profile and reference data in parallel
+        await Promise.all([loadUserProfile(), loadCustomersAndInvoices()]);
+
         setupEventListeners();
-        
-        console.log('[TAX ROAD DEBUG] Loading customers and invoices reference data...');
-        await loadCustomersAndInvoices();
-        
-        console.log('[TAX ROAD DEBUG] Fetching receipts...');
         await fetchReceipts();
     });
 }
 
 function setupNavigation() {
     console.log('[TAX ROAD DEBUG] === SETUP NAVIGATION START ===');
-    
+
     // Debug: Check sidebar in DOM
     const sidebar = document.getElementById('sidebar-container');
     console.log('[TAX ROAD DEBUG] Sidebar container exists:', !!sidebar);
     if (sidebar) {
         console.log('[TAX ROAD DEBUG] Sidebar innerHTML length:', sidebar.innerHTML.length);
     }
-    
+
     const hamburgerBtn = document.getElementById('hamburger-btn');
     const overlay = document.getElementById('mobile-overlay');
 
@@ -84,7 +75,7 @@ function setupNavigation() {
     console.log('[TAX ROAD DEBUG] === SEARCHING FOR LOGOUT BUTTON ===');
     const logoutBtn = document.getElementById('logout-btn');
     console.log('[TAX ROAD DEBUG] Logout button found:', !!logoutBtn);
-    
+
     if (logoutBtn) {
         console.log('[TAX ROAD DEBUG] ✓ Logout button FOUND - Adding click listener');
         logoutBtn.addEventListener('click', async () => {
@@ -99,7 +90,7 @@ function setupNavigation() {
         });
     } else {
         console.error('[TAX ROAD ERROR] ✗ Logout button NOT found');
-        console.error('[TAX ROAD DEBUG] Sidebar HTML search for "logout":', 
+        console.error('[TAX ROAD DEBUG] Sidebar HTML search for "logout":',
             sidebar?.innerHTML?.includes('logout') ? '✓ FOUND' : '✗ NOT FOUND');
     }
 
@@ -112,7 +103,7 @@ function setupNavigation() {
     } else {
         console.warn('[TAX ROAD WARN] Search input not found');
     }
-    
+
     console.log('[TAX ROAD DEBUG] === SETUP NAVIGATION END ===\n');
 }
 
@@ -131,8 +122,8 @@ async function loadUserProfile() {
         } else {
             console.warn('[TAX ROAD WARN] No user profile found in Firestore');
         }
-    } catch (e) { 
-        console.error('[TAX ROAD ERROR] Error loading user profile:', e); 
+    } catch (e) {
+        console.error('[TAX ROAD ERROR] Error loading user profile:', e);
     }
 }
 
@@ -180,6 +171,26 @@ function setupEventListeners() {
 
     form.addEventListener('submit', handleSaveReceipt);
 
+    // Attach Edit/Delete Listeners
+    tbody.addEventListener('click', (e) => {
+        const btnEdit = e.target.closest('.btn-edit');
+        const btnDelete = e.target.closest('.btn-delete');
+
+        if (btnEdit) {
+            const tr = btnEdit.closest('tr');
+            const id = tr.dataset.id;
+            const receipt = allReceiptsRaw.find(r => r.id === id);
+            if (receipt) openModalForEdit(receipt);
+        }
+
+        if (btnDelete) {
+            const tr = btnDelete.closest('tr');
+            const id = tr.dataset.id;
+            const receipt = allReceiptsRaw.find(r => r.id === id);
+            if (receipt) handleDeleteReceipt(receipt);
+        }
+    });
+
     // Auto-fill max amount when invoice selected
     invoiceSelect.addEventListener('change', async (e) => {
         const invId = e.target.value;
@@ -220,6 +231,11 @@ function setupEventListeners() {
 }
 
 function openModal() {
+    document.getElementById('receipt-id').value = '';
+    document.getElementById('receipt-amount').readOnly = false;
+    document.getElementById('receipt-invoice').disabled = false;
+    modalTitle.textContent = 'Record Payment';
+
     form.reset();
     document.getElementById('invoice-balance-info').classList.add('hidden');
     document.getElementById('receipt-date').value = new Date().toISOString().split('T')[0];
@@ -241,6 +257,47 @@ function openModal() {
     modal.classList.add('active');
 }
 
+function openModalForEdit(receipt) {
+    document.getElementById('receipt-id').value = receipt.id;
+    document.getElementById('receipt-amount').value = receipt.amountReceived;
+    document.getElementById('receipt-mode').value = receipt.paymentMode;
+    document.getElementById('receipt-date').value = receipt.date;
+
+    // Prevent changing the invoice entirely for an existing receipt to avoid complex dual-ledger balancing
+    invoiceSelect.innerHTML = `<option value="${receipt.invoiceId}">Invoice tied to this receipt</option>`;
+    document.getElementById('receipt-invoice').value = receipt.invoiceId;
+    document.getElementById('receipt-invoice').disabled = true;
+
+    // We allow amount editing, but we must validate max loosely or handle it strictly.
+    // For MVP, allow them to edit the amount.
+    document.getElementById('receipt-amount').max = "";
+    document.getElementById('invoice-balance-info').classList.add('hidden');
+    modalTitle.textContent = `Edit Payment - ${receipt.receiptNumber || 'N/A'}`;
+
+    modal.classList.add('active');
+}
+
+async function generateSafeReceiptNumber() {
+    console.log('[TAX ROAD DEBUG] Generating safe transaction-based receipt number...');
+    const counterRef = doc(db, `users/${currentUser.uid}/counters/receipts`);
+    let newSequence = 1;
+
+    await runTransaction(db, async (transaction) => {
+        const counterDoc = await transaction.get(counterRef);
+        if (!counterDoc.exists()) {
+            // First ever receipt
+            transaction.set(counterRef, { currentCount: 1 });
+            newSequence = 1;
+        } else {
+            const data = counterDoc.data();
+            newSequence = (data.currentCount || 0) + 1;
+            transaction.update(counterRef, { currentCount: newSequence });
+        }
+    });
+
+    return `REC-${String(newSequence).padStart(4, '0')}`;
+}
+
 function closeModal() {
     modal.classList.remove('active');
     form.reset();
@@ -249,6 +306,13 @@ function closeModal() {
 async function fetchReceipts() {
     try {
         console.log('[TAX ROAD DEBUG] Fetching receipts from Firestore...');
+
+        // Show loading state
+        if (tbody) {
+            tbody.innerHTML = `<tr><td colspan="7" class="text-center py-lg"><div class="loader mx-auto"></div><div class="text-muted mt-sm">Loading receipts...</div></td></tr>`;
+            tbody.closest('.table-container').style.opacity = '0.7';
+        }
+
         const q = query(collection(db, `users/${currentUser.uid}/receipts`));
         const snaps = await getDocs(q);
 
@@ -261,11 +325,15 @@ async function fetchReceipts() {
 
         allReceiptsRaw.sort((a, b) => new Date(b.date) - new Date(a.date));
 
+        if (tbody) tbody.closest('.table-container').style.opacity = '1';
         renderReceipts(allReceiptsRaw);
     } catch (error) {
         console.error("[TAX ROAD ERROR] Error fetching receipts:", error);
         showToast("Failed to load receipts.", "error");
-        tbody.innerHTML = `<tr><td colspan="5" class="text-center text-error">Failed to load data</td></tr>`;
+        if (tbody) {
+            tbody.closest('.table-container').style.opacity = '1';
+            tbody.innerHTML = `<tr><td colspan="7" class="text-center text-error">Failed to load data</td></tr>`;
+        }
     }
 }
 
@@ -292,7 +360,7 @@ function renderReceipts(dataList) {
     if (!tbody) return;
 
     if (dataList.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="5" class="text-center text-muted py-md">No receipts found.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="7" class="text-center text-muted py-md">No receipts found.</td></tr>`;
         return;
     }
 
@@ -302,13 +370,23 @@ function renderReceipts(dataList) {
         const invNum = inv ? inv.invoiceNumber : 'Unknown';
         const custName = inv ? (customerMap[inv.customerId] || 'Unknown') : 'Unknown';
 
+        const receiptNum = r.receiptNumber || 'N/A';
         html += `
             <tr data-id="${r.id}">
                 <td>${formatDate(r.date)}</td>
+                <td class="font-bold text-accent">${receiptNum}</td>
                 <td class="font-bold text-primary">${invNum}</td>
                 <td>${escapeHtml(custName)}</td>
                 <td><span class="badge" style="background:var(--bg-light-grey); color:var(--text-main); font-weight:normal;">${escapeHtml(r.paymentMode)}</span></td>
-                <td class="font-bold text-accent">${formatCurrency(r.amountReceived || 0)}</td>
+                <td class="font-bold">${formatCurrency(r.amountReceived || 0)}</td>
+                <td class="actions-cell">
+                    <button class="btn btn-outline btn-edit" style="padding: 6px; border-color: var(--accent); color: var(--accent);" title="Edit">
+                        <svg class="icon" viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
+                    </button>
+                    <button class="btn btn-outline btn-delete" style="padding: 6px; border-color: var(--text-error); color: var(--text-error);" title="Delete">
+                        <svg class="icon" viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
+                    </button>
+                </td>
             </tr>
         `;
     });
@@ -319,13 +397,16 @@ function renderReceipts(dataList) {
 async function handleSaveReceipt(e) {
     e.preventDefault();
 
-    const invId = invoiceSelect.value;
+    const id = document.getElementById('receipt-id').value;
+    const invId = document.getElementById('receipt-invoice').value;
     const amount = Number(amountInput.value);
     const maxAmount = Number(amountInput.max);
 
     if (!invId) return showToast("Select an invoice", "error");
     if (amount <= 0) return showToast("Amount must be greater than 0", "error");
-    if (amount > maxAmount + 0.01) { // tiny margin for float math
+
+    // Only check max amount rigidly if creating a new receipt (maxAmount is parsed from input.max)
+    if (!id && maxAmount > 0 && amount > maxAmount + 0.01) {
         return showToast(`Amount cannot exceed pending balance of ${formatCurrency(maxAmount)}`, "error");
     }
 
@@ -335,37 +416,46 @@ async function handleSaveReceipt(e) {
         btnSave.disabled = true;
         btnSave.textContent = 'Saving...';
 
-        // Use batch to update invoice status and add receipt atomically
-        // Using direct modular refs isn't straightforward for batch operations in simple web sdk sometimes without writeBatch imported from firestore
-        // Let's import writeBatch and do it right
+        const receiptRef = collection(db, `users/${currentUser.uid}/receipts`);
 
-        const receiptData = {
-            invoiceId: invId,
-            amountReceived: amount,
-            paymentMode: document.getElementById('receipt-mode').value,
-            date: document.getElementById('receipt-date').value,
-            createdAt: serverTimestamp()
-        };
+        let newOrUpdatedReceiptNum = "N/A";
 
-        // Add receipt
-        await addDoc(collection(db, `users/${currentUser.uid}/receipts`), receiptData);
+        if (id) {
+            // Updating existing receipt
+            const existingReceipt = allReceiptsRaw.find(r => r.id === id);
+            newOrUpdatedReceiptNum = existingReceipt.receiptNumber || 'N/A';
 
-        // Determine new invoice status
-        const invoice = invoiceMap[invId];
-        const isFullPayment = Math.abs(amount - maxAmount) < 0.01;
-        const newStatus = isFullPayment ? 'Paid' : 'Partially Paid';
+            const docRef = doc(db, `users/${currentUser.uid}/receipts`, id);
+            await updateDoc(docRef, {
+                amountReceived: amount,
+                paymentMode: document.getElementById('receipt-mode').value,
+                date: document.getElementById('receipt-date').value,
+                updatedAt: serverTimestamp()
+            });
+            showToast("Payment updated successfully");
 
-        // Update Invoice
-        const invRef = doc(db, `users/${currentUser.uid}/invoices`, invId);
-        await updateDoc(invRef, {
-            status: newStatus,
-            updatedAt: serverTimestamp()
-        });
+        } else {
+            // Create new receipt
+            newOrUpdatedReceiptNum = await generateSafeReceiptNumber();
 
-        showToast("Payment recorded successfully");
+            const receiptData = {
+                invoiceId: invId,
+                receiptNumber: newOrUpdatedReceiptNum,
+                amountReceived: amount,
+                paymentMode: document.getElementById('receipt-mode').value,
+                date: document.getElementById('receipt-date').value,
+                createdAt: serverTimestamp()
+            };
+
+            await addDoc(receiptRef, receiptData);
+            showToast("Payment recorded successfully");
+        }
+
+        // --- LEDGER RECALCULATION (CRITICAL) ---
+        // Recalculate invoice status strictly based on *all* receipts for this invoice
+        await recalculateInvoiceState(invId);
+
         closeModal();
-
-        // Reload all data to reflect status changes
         await loadCustomersAndInvoices();
         await fetchReceipts();
 
@@ -379,6 +469,66 @@ async function handleSaveReceipt(e) {
             Save Receipt
         `;
     }
+}
+
+async function handleDeleteReceipt(receipt) {
+    if (!confirm(`Are you sure you want to delete receipt ${receipt.receiptNumber || 'N/A'}?`)) {
+        return;
+    }
+
+    try {
+        const docRef = doc(db, `users/${currentUser.uid}/receipts`, receipt.id);
+        await deleteDoc(docRef);
+        showToast("Receipt deleted successfully");
+
+        // --- LEDGER RECALCULATION (CRITICAL) ---
+        await recalculateInvoiceState(receipt.invoiceId);
+
+        await loadCustomersAndInvoices();
+        await fetchReceipts();
+    } catch (error) {
+        console.error("Error deleting receipt:", error);
+        showToast("Error deleting receipt", "error");
+    }
+}
+
+// Ledger consistency function
+async function recalculateInvoiceState(invId) {
+    console.log(`[TAX ROAD DEBUG] Recalculating ledger for invoice ${invId}`);
+
+    // 1. Fetch exact total from the invoice doc
+    const invRef = doc(db, `users/${currentUser.uid}/invoices`, invId);
+    const invDoc = await getDoc(invRef);
+    if (!invDoc.exists()) return;
+
+    const invTotal = Number(invDoc.data().total) || 0;
+
+    // 2. Sum ALL receipts currently in DB for this invoice
+    const rQ = query(collection(db, `users/${currentUser.uid}/receipts`), where("invoiceId", "==", invId));
+    const rSnaps = await getDocs(rQ);
+
+    let totalPaid = 0;
+    rSnaps.forEach(snap => {
+        totalPaid += Number(snap.data().amountReceived) || 0;
+    });
+
+    // 3. Determine status
+    let newStatus = 'Pending';
+    if (totalPaid > 0) {
+        // give a tiny float gap 0.01 for JS math
+        if (Math.abs(invTotal - totalPaid) < 0.01 || totalPaid > invTotal) {
+            newStatus = 'Paid';
+        } else {
+            newStatus = 'Partially Paid';
+        }
+    }
+
+    // 4. Update the parent invoice
+    await updateDoc(invRef, {
+        status: newStatus,
+        updatedAt: serverTimestamp()
+    });
+    console.log(`[TAX ROAD DEBUG] Invoice ${invId} recalculated. Paid: ${totalPaid}, Status: ${newStatus}`);
 }
 
 // Utils
